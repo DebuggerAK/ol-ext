@@ -157,7 +157,10 @@ ol_control_Profil.prototype.info =
 	"xtitle": "Distance (km)",
 	"time": "Time",
 	"altitude": "Altitude",
-	"distance": "Distance"
+	"distance": "Distance",
+	"altitudeUnits": "m",
+	"distanceUnitsM": "m",
+	"distanceUnitsKM": "km",
 };
 
 /** Show popup info
@@ -202,8 +205,8 @@ ol_control_Profil.prototype.onMove = function(e)
 			this.cursor_.style.display = "none";
 		}
 		this.bar_.parentElement.classList.add("over");
-		this.element.querySelector(".point-info .z").textContent = p[1]+"m";
-		this.element.querySelector(".point-info .dist").textContent = (p[0]/1000).toFixed(1)+"km";
+		this.element.querySelector(".point-info .z").textContent = p[1]+this.info.altitudeUnits;
+		this.element.querySelector(".point-info .dist").textContent = (p[0]/1000).toFixed(1)+this.info.distanceUnitsKM;
 		this.element.querySelector(".point-info .time").textContent = p[2];
 		if (dx>this.canvas_.width/ratio/2) this.popup_.classList.add('ol-left');
 		else this.popup_.classList.remove('ol-left');
@@ -249,15 +252,15 @@ ol_control_Profil.prototype.isShown = function()
 
 /**
  * Set the geometry to draw the profil.
- * @param {ol.Feature|ol.geom} f the feature.
+ * @param {ol.Feature|ol.geom.Geometry} f the feature.
  * @param {Object=} options
- *		- projection {ol.ProjectionLike} feature projection, default projection of the map
- *		- zunit {m|km} default m
- *		- unit {m|km} default km
- *		- zmin {Number|undefined} default 0
- *		- zmax {Number|undefined} default max Z of the feature
- *		- graduation {Number|undefined} z graduation default 100
- *		- amplitude {integer|undefined} amplitude of the altitude, default zmax-zmin
+ *  @param {ol.ProjectionLike} options.projection feature projection, default projection of the map
+ *  @param {string} options.zunit 'm' or 'km', default m
+ *  @param {string} options.unit 'm' or 'km', default km
+ *  @param {Number|undefined} options.zmin default 0
+ *  @param {Number|undefined} options.zmax default max Z of the feature
+ *  @param {Number|undefined} options.graduation z graduation default 100
+ *  @param {integer|undefined} options.amplitude amplitude of the altitude, default zmax-zmin
  * @api stable
  */
 ol_control_Profil.prototype.setGeometry = function(g, options)
@@ -328,13 +331,13 @@ ol_control_Profil.prototype.setGeometry = function(g, options)
 	}
 
 	// Info
-	this.element.querySelector(".track-info .zmin").textContent = zmin.toFixed(2)+"m";
-	this.element.querySelector(".track-info .zmax").textContent = zmax.toFixed(2)+"m";
+	this.element.querySelector(".track-info .zmin").textContent = zmin.toFixed(2)+this.info.altitudeUnits;
+	this.element.querySelector(".track-info .zmax").textContent = zmax.toFixed(2)+this.info.altitudeUnits;
 	if (d>1000)
-	{	this.element.querySelector(".track-info .dist").textContent = (d/1000).toFixed(1)+"km";
+	{	this.element.querySelector(".track-info .dist").textContent = (d/1000).toFixed(1)+this.info.distanceUnitsKM;
 	}
 	else
-	{	this.element.querySelector(".track-info .dist").textContent= (d).toFixed(1)+"m";
+	{	this.element.querySelector(".track-info .dist").textContent= (d).toFixed(1)+this.info.distanceUnitsM;
 	}
 	this.element.querySelector(".track-info .time").textContent = ti;
 

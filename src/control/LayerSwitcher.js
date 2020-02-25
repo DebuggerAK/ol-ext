@@ -18,6 +18,8 @@ import ol_ext_element from '../util/element'
  * @classdesc OpenLayers 3 Layer Switcher Control.
  * @fires drawlist
  * @fires toggle
+ * @fires reorder-start
+ * @fires reorder-end
  * 
  * @constructor
  * @extends {ol_control_Control}
@@ -32,6 +34,7 @@ import ol_ext_element from '../util/element'
  *  @param {function} options.onextent callback when click on extent, default fits view to extent
  *  @param {number} options.drawDelay delay in ms to redraw the layer (usefull to prevent flickering when manipulating the layers)
  *  @param {boolean} options.collapsed collapse the layerswitcher at beginning, default true
+ *  @param {ol.layer.Group} options.layerGroup a layer group to display in the switcher, default display all layers of the map
  *
  * Layers attributes that control the switcher
  *	- allwaysOnTop {boolean} true to force layer stay on top of the others while reordering, default false
@@ -49,6 +52,7 @@ var ol_control_LayerSwitcher = function(options) {
   this.hastrash = options.trash;
   this.reordering = (options.reordering!==false);
   this._layers = [];
+  this._layerGroup = (options.layerGroup && options.layerGroup.getLayers) ? options.layerGroup : null;
 
   // displayInLayerSwitcher
   if (typeof(options.displayInLayerSwitcher) === 'function') {
@@ -174,9 +178,15 @@ ol_control_LayerSwitcher.prototype.setMap = function(map) {
   // Get change (new layer added or removed)
   if (map) {
     this._listener = {
-      change: map.getLayerGroup().on('change', this.drawPanel.bind(this)),
       moveend: map.on('moveend', this.viewChange.bind(this)),
       size: map.on('change:size', this.overflow.bind(this))
+    }
+    // Listen to a layer group
+    if (this._layerGroup) {
+      this._listener.change = this._layerGroup.on('change', this.drawPanel.bind(this));
+    } else  {
+      //Listen to all layers
+      this._listener.change = map.getLayerGroup().on('change', this.drawPanel.bind(this));
     }
   }
 };
@@ -295,26 +305,11 @@ ol_control_LayerSwitcher.prototype._getLayerForLI = function(li) {
  * @private
  */
 ol_control_LayerSwitcher.prototype.viewChange = function() {
-  var map = this.getMap();
-  var res = map.getView().getResolution();
   this.panel_.querySelectorAll('li').forEach( function(li) {
     var l = this._getLayerForLI(li);
     if (l) {
-      if (l.getMaxResolution()<=res || l.getMinResolution()>=res) {
-        li.classList.add('ol-layer-hidden');
-      } else {
-        var ex0 = l.getExtent();
-        if (ex0) {
-          var ex = map.getView().calculateExtent(map.getSize());
-          if (!ol_extent_intersects(ex, ex0)) {
-            li.classList.add('ol-layer-hidden');
-          } else {
-            li.classList.remove('ol-layer-hidden');
-          }
-        } else {
-          li.classList.remove('ol-layer-hidden');
-        }
-      }
+      if (this.testLayerVisibility(l)) li.classList.remove('ol-layer-hidden');
+      else li.classList.add('ol-layer-hidden');
     }
   }.bind(this));
 };
@@ -341,7 +336,7 @@ ol_control_LayerSwitcher.prototype.drawPanel_ = function() {
     if (!li.classList.contains('ol-header')) li.remove();
   }.bind(this));
   // Draw list
-  this.drawList (this.panel_, this.getMap().getLayers());
+  this.drawList (this.panel_, this._layerGroup ?  this._layerGroup.getLayers() : this.getMap().getLayers());
 };
 
 /** Change layer visibility according to the baselayer option
@@ -364,19 +359,18 @@ ol_control_LayerSwitcher.prototype.switchLayerVisibility = function(l, layers) {
  * @return {boolean}
  */
 ol_control_LayerSwitcher.prototype.testLayerVisibility = function(layer) {
-  if (this.getMap())
-  {	var res = this.getMap().getView().getResolution();
-    if (layer.getMaxResolution()<=res || layer.getMinResolution()>=res) return false;
-    else 
-    {	var ex0 = layer.getExtent();
-      if (ex0)
-      {	var ex = this.getMap().getView().calculateExtent(this.getMap().getSize());
-        return ol_extent_intersects(ex, ex0);
-      }
-      return true;
+  if (!this.getMap()) return true;
+  var res = this.getMap().getView().getResolution();
+  if (layer.getMaxResolution()<=res || layer.getMinResolution()>=res) {
+    return false;
+  } else {
+    var ex0 = layer.getExtent();
+    if (ex0) {
+      var ex = this.getMap().getView().calculateExtent(this.getMap().getSize());
+      return ol_extent_intersects(ex, ex0);
     }
+    return true;
   }
-  return true;
 };
 
 
@@ -408,7 +402,7 @@ ol_control_LayerSwitcher.prototype.dragOrdering_ = function(e) {
       if (drop && target) {
         var collection ;
         if (group) collection = group.getLayers();
-        else collection = self.getMap().getLayers();
+        else collection = self._layerGroup ?  self._layerGroup.getLayers() : self.getMap().getLayers();
         var layers = collection.getArray();
         // Switch layers
         for (var i=0; i<layers.length; i++) {
@@ -425,6 +419,8 @@ ol_control_LayerSwitcher.prototype.dragOrdering_ = function(e) {
           }
         }
       }
+
+      self.dispatchEvent({ type: "reorder-end", layer: drop, group: group });
     }
     
     elt.parentNode.querySelectorAll('li').forEach(function(li){
@@ -468,6 +464,7 @@ ol_control_LayerSwitcher.prototype.dragOrdering_ = function(e) {
         parent: panel 
       });
       self.element.classList.add('drag');
+      self.dispatchEvent({ type: "reorder-start", layer: layer, group: group });
     }
     // Start a new drag sequence
     if (!start) {
@@ -637,7 +634,7 @@ ol_control_LayerSwitcher.prototype.drawList = function(ul, collection) {
 
     // Content div
     var d = ol_ext_element.create('DIV', {
-      className: 'li-content' + (this.testLayerVisibility(layer) ? '' : ' ol-layer-hidden'),
+      className: 'li-content',// + (this.testLayerVisibility(layer) ? '' : ' ol-layer-hidden'),
       parent: li
     });
     

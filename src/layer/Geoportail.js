@@ -11,48 +11,61 @@ import {transformExtent as ol_proj_transformExtent} from 'ol/proj'
 import ol_source_Geoportail from '../source/Geoportail'
 
 /** IGN's Geoportail WMTS layer definition
-* @constructor 
-* @extends {ol.layer.Tile}
-* @param {string} layer Layer name
-* @param {olx.layer.WMTSOptions=} options WMTS options if not defined default are used
-* @param {olx.source.WMTSOptions=} options WMTS options if not defined default are used
-*/
+ * @constructor 
+ * @extends {ol.layer.Tile}
+ * @param {olx.layer.WMTSOptions=} options WMTS options if not defined default are used
+ *  @param {string} options.layer Geoportail layer name
+ *  @param {string} options.gppKey Geoportail API key
+ *  @param {olx.source.WMTSOptions=} tileoptions WMTS options if not defined default are used
+ */
 var ol_layer_Geoportail = function(layer, options, tileoptions) {
   options = options || {};
-	tileoptions = tileoptions || {};
+  tileoptions = tileoptions || {};
+  // use function(options, tileoption) when layer is set in options
+  if (layer.layer) {
+    options = layer;
+    tileoptions = options;
+    layer = options.layer;
+  }
+  var maxZoom = options.maxZoom;
 
-	var capabilities = window.geoportailConfig ? window.geoportailConfig.capabilities[options.key] || window.geoportailConfig.capabilities["default"] : ol_layer_Geoportail.capabilities;
+  var capabilities = window.geoportailConfig ? window.geoportailConfig.capabilities[options.gppKey || options.key] || window.geoportailConfig.capabilities["default"] || ol_layer_Geoportail.capabilities : ol_layer_Geoportail.capabilities;
   capabilities = capabilities[layer];
-	if (!capabilities) {
+  if (!capabilities) {
     capabilities = { title: layer, originators: [] };
     console.error("ol.layer.Geoportail: no layer definition for \""+layer+"\"\nTry to use ol/layer/Geoportail~loadCapabilities() to get it.");
     // throw new Error("ol.layer.Geoportail: no layer definition for \""+layer+"\"");
   }
 
-	// tile options & default params
-	for (var i in capabilities) if (typeof	tileoptions[i]== "undefined") tileoptions[i] = capabilities[i];
+  // tile options & default params
+  for (var i in capabilities) if (typeof	tileoptions[i]== "undefined") tileoptions[i] = capabilities[i];
 
-	this._originators = capabilities.originators;
+  this._originators = capabilities.originators;
 
-	if (!tileoptions.gppKey) tileoptions.gppKey = options.gppKey || options.key;
-	options.source = new ol_source_Geoportail(layer, tileoptions);
-	if (!options.name) options.name = capabilities.title;
-	if (!options.desc) options.desc = capabilities.desc;
-	if (!options.extent && capabilities.bbox) {
-    if (capabilities.bbox[0]>-170 && capabilities.bbox[2]<170)
-    options.extent = ol_proj_transformExtent(capabilities.bbox, 'EPSG:4326', 'EPSG:3857');
-	}
+  if (!tileoptions.gppKey) tileoptions.gppKey = options.gppKey || options.key;
+  options.source = new ol_source_Geoportail(layer, tileoptions);
+  if (!options.title) options.title = capabilities.title;
+  if (!options.name) options.name = layer;
+  options.layer = layer;
+  if (!options.queryable) options.queryable = capabilities.queryable;
+  if (!options.desc) options.desc = capabilities.desc;
+  if (!options.extent && capabilities.bbox) {
+    if (capabilities.bbox[0]>-170 && capabilities.bbox[2]<170) {
+      options.extent = ol_proj_transformExtent(capabilities.bbox, 'EPSG:4326', 'EPSG:3857');
+    }
+  }
+  options.maxZoom = maxZoom;
 
-	// calculate layer max resolution
-	if (!options.maxResolution && tileoptions.minZoom) {
+  // calculate layer max resolution
+  if (!options.maxResolution && tileoptions.minZoom) {
     options.source.getTileGrid().minZoom -= (tileoptions.minZoom>1 ? 2 : 1);
-		options.maxResolution = options.source.getTileGrid().getResolution(options.source.getTileGrid().minZoom)
-		options.source.getTileGrid().minZoom = tileoptions.minZoom;
+    options.maxResolution = options.source.getTileGrid().getResolution(options.source.getTileGrid().minZoom)
+    options.source.getTileGrid().minZoom = tileoptions.minZoom;
   }
 
   ol_layer_Tile.call (this, options);
 
-// BUG GPP: Attributions constraints are not set properly :(
+  // BUG GPP: Attributions constraints are not set properly :(
 /** /
 
   // Set attribution according to the originators
@@ -135,14 +148,14 @@ ol_ext_inherits (ol_layer_Geoportail, ol_layer_Tile);
 /** Default capabilities for main layers
  */
 ol_layer_Geoportail.capabilities = {
-	"GEOGRAPHICALGRIDSYSTEMS.MAPS":{"server":"https://wxs.ign.fr/geoportail/wmts","title":"Cartes IGN","order":"9980000","format":"image/jpeg","tilematrix":"PM","style":"normal","minZoom":0,"maxZoom":18,"bbox":[-180,-68.138855,180,80],"desc":"Cartes IGN","keys":"Cartes","qlook":"https://wxs.ign.fr/static/pictures/ign_carte2.jpg","legend":[],"originators":{"IGN":{"href":"http://www.ign.fr","attribution":"Institut national de l'information géographique et forestière","logo":"https://wxs.ign.fr/static/logos/IGN/IGN.gif","minZoom":6,"maxZoom":18,"constraint":[{"minZoom":17,"maxZoom":17,"bbox":[-63.189117,-21.428364,55.84698,51.175068]},{"minZoom":18,"maxZoom":18,"bbox":[-63.189068,-21.428364,55.846638,51.175068]},{"minZoom":7,"maxZoom":8,"bbox":[-178.20573,-68.138855,144.84375,51.909786]},{"minZoom":13,"maxZoom":14,"bbox":[-178.20573,-67.101425,142.03836,51.44377]},{"minZoom":11,"maxZoom":12,"bbox":[-178.20573,-67.101425,142.03836,51.444122]},{"minZoom":9,"maxZoom":10,"bbox":[-178.20573,-68.138855,144.84375,51.444016]},{"minZoom":15,"maxZoom":16,"bbox":[-178.20573,-46.502903,77.60037,51.175068]},{"minZoom":0,"maxZoom":6,"bbox":[-180,-60,180,80]}]},"NCL-DITTT":{"href":"http://www.dittt.gouv.nc/portal/page/portal/dittt","attribution":"Direction des Infrastructures, de la Topographie et des Transports Terrestres du gouvernement de la Nouvelle-Calédonie","logo":"https://wxs.ign.fr/static/logos/NCL-DITTT/NCL-DITTT.gif","minZoom":0,"maxZoom":16,"constraint":[{"minZoom":8,"maxZoom":10,"bbox":[163.47784,-22.854631,168.24048,-19.402704]},{"minZoom":11,"maxZoom":13,"bbox":[163.47784,-22.972307,168.24327,-19.494438]},{"minZoom":14,"maxZoom":15,"bbox":[164.53125,-22.75592,168.22266,-20.303417]},{"minZoom":16,"maxZoom":16,"bbox":[163.47784,-22.79525,168.19109,-19.494438]}]}}},
-	"GEOGRAPHICALGRIDSYSTEMS.MAPS.SCAN-EXPRESS.STANDARD":{"server":"https://wxs.ign.fr/geoportail/wmts","title":"Carte IGN","format":"image/jpeg","tilematrix":"PM","style":"normal","minZoom":0,"maxZoom":18,"bbox":[-179.62723,-84.5047,179.74588,85.47958],"desc":"Cartographie topographique multi-échelles du territoire français issue des bases de données vecteur de l’IGN - emprise nationale, visible du 1/200 au 1/130000000","keys":"Cartes","qlook":"https://wxs.ign.fr/static/pictures/ign_scan-express-standard.png","legend":[{"zoom":5,"url":"https://wxs.ign.fr/static/legends/GEOGRAPHICALGRIDSYSTEMS.MAPS.SCAN-EXPRESS.STANDARD-legend-1000k.png"},{"zoom":2,"url":"https://wxs.ign.fr/static/legends/GEOGRAPHICALGRIDSYSTEMS.MAPS.SCAN-EXPRESS.STANDARD-legend-1000k.png"},{"zoom":3,"url":"https://wxs.ign.fr/static/legends/GEOGRAPHICALGRIDSYSTEMS.MAPS.SCAN-EXPRESS.STANDARD-legend-1000k.png"},{"zoom":4,"url":"https://wxs.ign.fr/static/legends/GEOGRAPHICALGRIDSYSTEMS.MAPS.SCAN-EXPRESS.STANDARD-legend-1000k.png"},{"zoom":8,"url":"https://wxs.ign.fr/static/legends/GEOGRAPHICALGRIDSYSTEMS.MAPS.SCAN-EXPRESS.STANDARD-legend-1000k.png"},{"zoom":16,"url":"https://wxs.ign.fr/static/legends/GEOGRAPHICALGRIDSYSTEMS.MAPS.SCAN-EXPRESS.STANDARD-legend-50k-25k.png"},{"zoom":18,"url":"https://wxs.ign.fr/static/legends/GEOGRAPHICALGRIDSYSTEMS.MAPS.SCAN-EXPRESS.STANDARD-legend-GE.png"},{"zoom":17,"url":"https://wxs.ign.fr/static/legends/GEOGRAPHICALGRIDSYSTEMS.MAPS.SCAN-EXPRESS.STANDARD-legend-GE.png"},{"zoom":15,"url":"https://wxs.ign.fr/static/legends/GEOGRAPHICALGRIDSYSTEMS.MAPS.SCAN-EXPRESS.STANDARD-legend-50k-25k.png"},{"zoom":14,"url":"https://wxs.ign.fr/static/legends/GEOGRAPHICALGRIDSYSTEMS.MAPS.SCAN-EXPRESS.STANDARD-legend-50k-25k.png"},{"zoom":13,"url":"https://wxs.ign.fr/static/legends/GEOGRAPHICALGRIDSYSTEMS.MAPS.SCAN-EXPRESS.STANDARD-legend-100k.png"}],"originators":{"IGN":{"href":"http://www.ign.fr","attribution":"Institut national de l'information géographique et forestière","logo":"https://wxs.ign.fr/static/logos/IGN/IGN.gif","minZoom":0,"maxZoom":18,"constraint":[{"minZoom":13,"maxZoom":13,"bbox":[-63.37252,13.428586,11.429714,51.44377]},{"minZoom":11,"maxZoom":12,"bbox":[-63.37252,13.428586,11.496459,51.444122]},{"minZoom":9,"maxZoom":9,"bbox":[-64.81273,13.428586,11.496459,51.444016]},{"minZoom":10,"maxZoom":10,"bbox":[-63.37252,13.428586,11.496459,51.444016]},{"minZoom":0,"maxZoom":2,"bbox":[-175.99709,-84.42859,175.99709,84.2865]},{"minZoom":4,"maxZoom":4,"bbox":[-179.62723,-84.0159,-179.21112,85.47958]},{"minZoom":18,"maxZoom":18,"bbox":[-63.189068,-21.428364,55.846638,51.175068]},{"minZoom":15,"maxZoom":17,"bbox":[-63.189117,-21.428364,55.84698,51.175068]},{"minZoom":14,"maxZoom":14,"bbox":[-63.283817,-21.7006,56.039127,51.44377]},{"minZoom":6,"maxZoom":8,"bbox":[-179.49689,-84.02368,179.74588,85.30035]},{"minZoom":3,"maxZoom":3,"bbox":[-176.23093,-84.5047,179.08267,84.89126]},{"minZoom":5,"maxZoom":5,"bbox":[-179.57285,-83.84196,178.4975,85.36646]}]}}},
-	"ELEVATION.SLOPES":{"server":"https://wxs.ign.fr/geoportail/wmts","title":"Altitude","order":"9890000","format":"image/jpeg","tilematrix":"PM","style":"normal","minZoom":6,"maxZoom":14,"bbox":[-178.20589,-22.595179,167.43176,50.93085],"desc":"La couche altitude se compose d'un MNT (Modèle Numérique de Terrain) affiché en teintes hypsométriques et issu de la BD ALTI®.","keys":"Cartes","qlook":"https://wxs.ign.fr/static/pictures/ign_altitude.jpg","legend":[],"originators":{"IGN":{"href":"http://www.ign.fr","attribution":"Institut national de l'information géographique et forestière","logo":"https://wxs.ign.fr/static/logos/IGN/IGN.gif","minZoom":5,"maxZoom":14,"constraint":[{"minZoom":6,"maxZoom":14,"bbox":[55.205746,-21.392344,55.846554,-20.86271]}]}}},
-	"GEOGRAPHICALGRIDSYSTEMS.MAPS.BDUNI.J1":{"server":"https://wxs.ign.fr/geoportail/wmts","title":"Plan IGN j+1","format":"image/png","tilematrix":"PM","style":"normal","minZoom":0,"maxZoom":18,"bbox":[-179.5,-75,179.5,75],"desc":"Plan IGN j+1","keys":"Plan IGN J+1","legend":[{"zoom":18,"url":"https://wxs.ign.fr/static/legends/BDUNI/BDUNI.png"}],"originators":{"IGN":{"href":"http://www.ign.fr","attribution":"Institut national de l'information géographique et forestière","logo":"https://wxs.ign.fr/static/logos/IGN/IGN.gif","minZoom":6,"maxZoom":18,"constraint":[{"minZoom":0,"maxZoom":18,"bbox":[-179,-80,179,80]}]}}},
-	"CADASTRALPARCELS.PARCELS":{"server":"https://wxs.ign.fr/geoportail/wmts","title":"Parcelles cadastrales","order":"9790000","format":"image/png","tilematrix":"PM","style":"bdparcellaire","minZoom":0,"maxZoom":20,"bbox":[-63.160706,-21.39223,55.84643,51.090965],"desc":"Limites des parcelles cadastrales issues de plans scannés et de plans numériques.","keys":"Parcelles cadastrales","qlook":"https://wxs.ign.fr/static/pictures/BDPARCELLAIRE.png","legend":[],"originators":{"IGN":{"href":"http://www.ign.fr","attribution":"Institut national de l'information géographique et forestière","logo":"https://wxs.ign.fr/static/logos/IGN/IGN.gif","minZoom":0,"maxZoom":20,"constraint":[{"minZoom":0,"maxZoom":20,"bbox":[-63.160706,-21.39223,55.84643,51.090965]}]}}},
-	"ORTHOIMAGERY.ORTHOPHOTOS":{"server":"https://wxs.ign.fr/geoportail/wmts","title":"Photographies aériennes","order":"9990000","format":"image/jpeg","tilematrix":"PM","style":"normal","minZoom":0,"bbox":[-180,-86,180,84],"desc":"Photographies aériennes","keys":"Photographies","qlook":"https://wxs.ign.fr/static/pictures/ign_ortho.jpg","legend":[{"zoom":19,"url":"https://wxs.ign.fr/static/legends/ign_bdortho_legende.jpg"}],"originators":{"PLANETOBSERVER":{"href":"http://www.planetobserver.com/","attribution":"PlanetObserver (images satellites)","logo":"https://wxs.ign.fr/static/logos/PLANETOBSERVER/PLANETOBSERVER.gif","minZoom":0,"maxZoom":12,"constraint":[{"minZoom":0,"maxZoom":12,"bbox":[-180,-86,180,84]}]},"MPM":{"href":"http://www.marseille-provence.com/","attribution":"Marseille Provence Métropole","logo":"https://wxs.ign.fr/static/logos/MPM/MPM.gif","minZoom":0,"maxZoom":20,"constraint":[{"minZoom":20,"maxZoom":20,"bbox":[5.076959,43.153347,5.7168245,43.454994]}]},"IGN":{"href":"http://www.ign.fr","attribution":"Institut national de l'information géographique et forestière","logo":"https://wxs.ign.fr/static/logos/IGN/IGN.gif","minZoom":13,"maxZoom":20,"constraint":[{"bbox":[0.035491213,43.221077,6.0235267,49.696926]},{"minZoom":20,"maxZoom":20,"bbox":[0.035491213,43.221077,6.0235267,49.696926]},{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"CRAIG":{"href":"http://www.craig.fr","attribution":"Centre Régional Auvergnat de l'Information Géographique (CRAIG)","logo":"https://wxs.ign.fr/static/logos/CRAIG/CRAIG.gif","minZoom":13,"maxZoom":20,"constraint":[{"minZoom":20,"maxZoom":20,"bbox":[2.2243388,44.76621,2.7314367,45.11295]},{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"CNES":{"href":"http://www.cnes.fr/","attribution":"Centre national d'études spatiales (CNES)","logo":"https://wxs.ign.fr/static/logos/CNES/CNES.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"CG06":{"href":"http://www.cg06.fr","attribution":"Département Alpes Maritimes (06) en partenariat avec : Groupement Orthophoto 06 (NCA, Ville de Cannes, CARF, CASA,CG06, CA de Grasse) ","logo":"https://wxs.ign.fr/static/logos/CG06/CG06.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"CG45":{"href":"http://www.loiret.com","attribution":"Le conseil général du Loiret","logo":"https://wxs.ign.fr/static/logos/CG45/CG45.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"RGD_SAVOIE":{"href":"http://www.rgd.fr","attribution":"Régie de Gestion de Données des Pays de Savoie (RGD 73-74)","logo":"https://wxs.ign.fr/static/logos/RGD_SAVOIE/RGD_SAVOIE.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"e-Megalis":{"href":"http://www.e-megalisbretagne.org//","attribution":"Syndicat mixte de coopération territoriale (e-Megalis)","logo":"https://wxs.ign.fr/static/logos/e-Megalis/e-Megalis.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"SIGLR":{"href":"http://www.siglr.org//","attribution":"SIGLR","logo":"https://wxs.ign.fr/static/logos/SIGLR/SIGLR.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"PPIGE":{"href":"http://www.ppige-npdc.fr/","attribution":"PPIGE","logo":"https://wxs.ign.fr/static/logos/PPIGE/PPIGE.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"FEDER2":{"href":"http://www.europe-en-france.gouv.fr/","attribution":"Fonds européen de développement économique et régional","logo":"https://wxs.ign.fr/static/logos/FEDER2/FEDER2.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"FEDER":{"href":"http://www.europe-en-france.gouv.fr/","attribution":"Fonds européen de développement économique et régional","logo":"https://wxs.ign.fr/static/logos/FEDER/FEDER.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"CRCORSE":{"href":"http://www.corse.fr//","attribution":"CRCORSE","logo":"https://wxs.ign.fr/static/logos/CRCORSE/CRCORSE.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"CNES_AUVERGNE":{"href":"http://www.cnes.fr/","attribution":"Centre national d'études spatiales (CNES)","logo":"https://wxs.ign.fr/static/logos/CNES_AUVERGNE/CNES_AUVERGNE.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"FEDER_PAYSDELALOIRE":{"href":"http://www.europe-en-paysdelaloire.eu/","attribution":"Pays-de-la-Loire","logo":"https://wxs.ign.fr/static/logos/FEDER_PAYSDELALOIRE/FEDER_PAYSDELALOIRE.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"FEDER_AUVERGNE":{"href":"http://www.europe-en-auvergne.eu/","attribution":"Auvergne","logo":"https://wxs.ign.fr/static/logos/FEDER_AUVERGNE/FEDER_AUVERGNE.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"PREFECTURE_GUADELOUPE":{"href":"www.guadeloupe.pref.gouv.fr/","attribution":"guadeloupe","logo":"https://wxs.ign.fr/static/logos/PREFECTURE_GUADELOUPE/PREFECTURE_GUADELOUPE.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"BOURGOGNE-FRANCHE-COMTE":{"href":"https://www.bourgognefranchecomte.fr/","attribution":"Auvergne","logo":"https://wxs.ign.fr/static/logos/BOURGOGNE-FRANCHE-COMTE/BOURGOGNE-FRANCHE-COMTE.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"ASTRIUM":{"href":"http://www.geo-airbusds.com/","attribution":"Airbus Defence and Space","logo":"https://wxs.ign.fr/static/logos/ASTRIUM/ASTRIUM.gif","minZoom":13,"maxZoom":16,"constraint":[{"minZoom":13,"maxZoom":16,"bbox":[-55.01953,1.845384,-50.88867,6.053161]}]},"DITTT":{"href":"http://www.dittt.gouv.nc/portal/page/portal/dittt/","attribution":"Direction des Infrastructures, de la Topographie et des Transports Terrestres","logo":"https://wxs.ign.fr/static/logos/DITTT/DITTT.gif","minZoom":13,"maxZoom":18,"constraint":[{"minZoom":13,"maxZoom":18,"bbox":[163.47784,-22.767689,167.94624,-19.434975]}]},"CNES_ALSACE":{"href":"http://www.cnes.fr/","attribution":"Centre national d'études spatiales (CNES)","logo":"https://wxs.ign.fr/static/logos/CNES_ALSACE/CNES_ALSACE.gif","minZoom":13,"maxZoom":18,"constraint":[{"minZoom":13,"maxZoom":18,"bbox":[-179.5,-75,179.5,75]}]},"CNES_971":{"href":"http://www.cnes.fr/","attribution":"Centre national d'études spatiales (CNES)","logo":"https://wxs.ign.fr/static/logos/CNES_971/CNES_971.gif","minZoom":13,"maxZoom":18,"constraint":[{"minZoom":13,"maxZoom":18,"bbox":[-179.5,-75,179.5,75]}]},"CNES_972":{"href":"http://www.cnes.fr/","attribution":"Centre national d'études spatiales (CNES)","logo":"https://wxs.ign.fr/static/logos/CNES_972/CNES_972.gif","minZoom":13,"maxZoom":18,"constraint":[{"minZoom":13,"maxZoom":18,"bbox":[-179.5,-75,179.5,75]}]},"CNES_974":{"href":"http://www.cnes.fr/","attribution":"Centre national d'études spatiales (CNES)","logo":"https://wxs.ign.fr/static/logos/CNES_974/CNES_974.gif","minZoom":13,"maxZoom":18,"constraint":[{"minZoom":13,"maxZoom":18,"bbox":[-179.5,-75,179.5,75]}]},"CNES_975":{"href":"http://www.cnes.fr/","attribution":"Centre national d'études spatiales (CNES)","logo":"https://wxs.ign.fr/static/logos/CNES_975/CNES_975.gif","minZoom":13,"maxZoom":18,"constraint":[{"minZoom":13,"maxZoom":18,"bbox":[-179.5,-75,179.5,75]}]},"CNES_976":{"href":"http://www.cnes.fr/","attribution":"Centre national d'études spatiales (CNES)","logo":"https://wxs.ign.fr/static/logos/CNES_976/CNES_976.gif","minZoom":13,"maxZoom":18,"constraint":[{"minZoom":13,"maxZoom":18,"bbox":[-179.5,-75,179.5,75]}]},"CNES_977":{"href":"http://www.cnes.fr/","attribution":"Centre national d'études spatiales (CNES)","logo":"https://wxs.ign.fr/static/logos/CNES_977/CNES_977.gif","minZoom":13,"maxZoom":18,"constraint":[{"minZoom":13,"maxZoom":18,"bbox":[-179.5,-75,179.5,75]}]},"CNES_978":{"href":"http://www.cnes.fr/","attribution":"Centre national d'études spatiales (CNES)","logo":"https://wxs.ign.fr/static/logos/CNES_978/CNES_978.gif","minZoom":13,"maxZoom":18,"constraint":[{"minZoom":13,"maxZoom":18,"bbox":[-179.5,-75,179.5,75]}]}}},
-	"GEOGRAPHICALGRIDSYSTEMS.PLANIGN":{"server":"https://wxs.ign.fr/geoportail/wmts","title":"Plan IGN","format":"image/jpeg","tilematrix":"PM","style":"normal","minZoom":0,"maxZoom":18,"bbox":[-179.5,-75,179.5,75],"desc":"Représentation graphique des bases de données IGN.","keys":"Cartes","qlook":"https://wxs.ign.fr/static/pictures/ign_carte2.jpg","legend":[],"originators":{"IGN":{"href":"http://www.ign.fr","attribution":"Institut national de l'information géographique et forestière","logo":"https://wxs.ign.fr/static/logos/IGN/IGN.gif","minZoom":9,"maxZoom":18,"constraint":[{"minZoom":10,"maxZoom":18,"bbox":[-63.37252,-21.475586,55.925865,51.31212]},{"minZoom":0,"maxZoom":9,"bbox":[-179.5,-75,179.5,75]}]}}},
-	"TRANSPORTNETWORKS.ROADS":{"server":"https://wxs.ign.fr/geoportail/wmts","title":"Routes","order":"8990000","format":"image/png","tilematrix":"PM","style":"normal","minZoom":6,"maxZoom":18,"bbox":[-63.969162,-21.49687,55.964417,71.584076],"desc":"Affichage du réseau routier français et européen.","keys":"Réseau routier","qlook":"https://wxs.ign.fr/static/pictures/ign_routes2.jpg","legend":[],"originators":{"IGN":{"href":"http://www.ign.fr","attribution":"Institut national de l'information géographique et forestière","logo":"https://wxs.ign.fr/static/logos/IGN/IGN.gif","minZoom":9,"maxZoom":18,"constraint":[{"minZoom":15,"maxZoom":18,"bbox":[-63.37252,-21.475586,55.925865,51.31212]},{"minZoom":6,"maxZoom":14,"bbox":[-63.969162,-21.49687,55.964417,71.584076]}]}}}
+  "GEOGRAPHICALGRIDSYSTEMS.MAPS.SCAN-EXPRESS.STANDARD": {"server":"https://wxs.ign.fr/geoportail/wmts","layer":"GEOGRAPHICALGRIDSYSTEMS.MAPS.SCAN-EXPRESS.STANDARD","title":"Carte IGN","format":"image/jpeg","style":"normal","queryable":false,"tilematrix":"PM","minZoom":0,"maxZoom":18,"bbox":[-179.62723,-84.5047,179.74588,85.47958],"desc":"Cartographie topographique multi-échelles du territoire français issue des bases de données vecteur de l’IGN - emprise nationale, visible du 1/200 au 1/130000000","originators":{"IGN":{"href":"http://www.ign.fr","attribution":"Institut national de l'information géographique et forestière","logo":"https://wxs.ign.fr/static/logos/IGN/IGN.gif","minZoom":0,"maxZoom":18,"constraint":[{"minZoom":13,"maxZoom":13,"bbox":[-63.37252,13.428586,11.429714,51.44377]},{"minZoom":11,"maxZoom":12,"bbox":[-63.37252,13.428586,11.496459,51.444122]},{"minZoom":9,"maxZoom":9,"bbox":[-64.81273,13.428586,11.496459,51.444016]},{"minZoom":10,"maxZoom":10,"bbox":[-63.37252,13.428586,11.496459,51.444016]},{"minZoom":0,"maxZoom":2,"bbox":[-175.99709,-84.42859,175.99709,84.2865]},{"minZoom":4,"maxZoom":4,"bbox":[-179.62723,-84.0159,-179.21112,85.47958]},{"minZoom":18,"maxZoom":18,"bbox":[-63.189068,-21.428364,55.846638,51.175068]},{"minZoom":15,"maxZoom":17,"bbox":[-63.189117,-21.428364,55.84698,51.175068]},{"minZoom":14,"maxZoom":14,"bbox":[-63.283817,-21.7006,56.039127,51.44377]},{"minZoom":6,"maxZoom":8,"bbox":[-179.49689,-84.02368,179.74588,85.30035]},{"minZoom":3,"maxZoom":3,"bbox":[-176.23093,-84.5047,179.08267,84.89126]},{"minZoom":5,"maxZoom":5,"bbox":[-179.57285,-83.84196,178.4975,85.36646]}]}}},
+  "ELEVATION.SLOPES": {"server":"https://wxs.ign.fr/geoportail/wmts","layer":"ELEVATION.SLOPES","title":"Altitude","format":"image/jpeg","style":"normal","queryable":true,"tilematrix":"PM","minZoom":6,"maxZoom":14,"bbox":[-178.20589,-22.595179,167.43176,50.93085],"desc":"La couche altitude se compose d'un MNT (Modèle Numérique de Terrain) affiché en teintes hypsométriques et issu de la BD ALTI®.","originators":{"IGN":{"href":"http://www.ign.fr","attribution":"Institut national de l'information géographique et forestière","logo":"https://wxs.ign.fr/static/logos/IGN/IGN.gif","minZoom":6,"maxZoom":14,"constraint":[{"minZoom":6,"maxZoom":14,"bbox":[55.205746,-21.392344,55.846554,-20.86271]}]}}},
+  "GEOGRAPHICALGRIDSYSTEMS.MAPS.BDUNI.J1": {"server":"https://wxs.ign.fr/geoportail/wmts","layer":"GEOGRAPHICALGRIDSYSTEMS.MAPS.BDUNI.J1","title":"Plan IGN j+1","format":"image/png","style":"normal","queryable":false,"tilematrix":"PM","minZoom":0,"maxZoom":18,"bbox":[-179.5,-75,179.5,75],"desc":"Plan IGN j+1","originators":{"IGN":{"href":"http://www.ign.fr","attribution":"Institut national de l'information géographique et forestière","logo":"https://wxs.ign.fr/static/logos/IGN/IGN.gif","minZoom":0,"maxZoom":18,"constraint":[{"minZoom":0,"maxZoom":18,"bbox":[-179,-80,179,80]}]}}},
+  "CADASTRALPARCELS.PARCELS": {"server":"https://wxs.ign.fr/geoportail/wmts","layer":"CADASTRALPARCELS.PARCELS","title":"Parcelles cadastrales","format":"image/png","style":"bdparcellaire","queryable":false,"tilematrix":"PM","minZoom":0,"maxZoom":20,"bbox":[-63.160706,-21.39223,55.84643,51.090965],"desc":"Limites des parcelles cadastrales issues de plans scannés et de plans numériques.","originators":{"IGN":{"href":"http://www.ign.fr","attribution":"Institut national de l'information géographique et forestière","logo":"https://wxs.ign.fr/static/logos/IGN/IGN.gif","minZoom":0,"maxZoom":20,"constraint":[{"minZoom":0,"maxZoom":20,"bbox":[-63.160706,-21.39223,55.84643,51.090965]}]}}},
+  "ORTHOIMAGERY.ORTHOPHOTOS": {"server":"https://wxs.ign.fr/geoportail/wmts","layer":"ORTHOIMAGERY.ORTHOPHOTOS","title":"Photographies aériennes","format":"image/jpeg","style":"normal","queryable":true,"tilematrix":"PM","minZoom":0,"bbox":[-180,-86,180,84],"desc":"Photographies aériennes","originators":{"PLANETOBSERVER":{"href":"http://www.planetobserver.com/","attribution":"PlanetObserver (images satellites)","logo":"https://wxs.ign.fr/static/logos/PLANETOBSERVER/PLANETOBSERVER.gif","minZoom":0,"maxZoom":12,"constraint":[{"minZoom":0,"maxZoom":12,"bbox":[-180,-86,180,84]}]},"MPM":{"href":"http://www.marseille-provence.com/","attribution":"Marseille Provence Métropole","logo":"https://wxs.ign.fr/static/logos/MPM/MPM.gif","minZoom":20,"maxZoom":20,"constraint":[{"minZoom":20,"maxZoom":20,"bbox":[5.076959,43.153347,5.7168245,43.454994]}]},"IGN":{"href":"http://www.ign.fr","attribution":"Institut national de l'information géographique et forestière","logo":"https://wxs.ign.fr/static/logos/IGN/IGN.gif","minZoom":13,"maxZoom":20,"constraint":[{"bbox":[0.035491213,43.221077,6.0235267,49.696926]},{"minZoom":20,"maxZoom":20,"bbox":[0.035491213,43.221077,6.0235267,49.696926]},{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"CRAIG":{"href":"http://www.craig.fr","attribution":"Centre Régional Auvergnat de l'Information Géographique (CRAIG)","logo":"https://wxs.ign.fr/static/logos/CRAIG/CRAIG.gif","minZoom":13,"maxZoom":20,"constraint":[{"minZoom":20,"maxZoom":20,"bbox":[2.2243388,44.76621,2.7314367,45.11295]},{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"CNES":{"href":"http://www.cnes.fr/","attribution":"Centre national d'études spatiales (CNES)","logo":"https://wxs.ign.fr/static/logos/CNES/CNES.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"CG06":{"href":"http://www.cg06.fr","attribution":"Département Alpes Maritimes (06) en partenariat avec : Groupement Orthophoto 06 (NCA, Ville de Cannes, CARF, CASA,CG06, CA de Grasse) ","logo":"https://wxs.ign.fr/static/logos/CG06/CG06.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"CG45":{"href":"http://www.loiret.com","attribution":"Le conseil général du Loiret","logo":"https://wxs.ign.fr/static/logos/CG45/CG45.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"RGD_SAVOIE":{"href":"http://www.rgd.fr","attribution":"Régie de Gestion de Données des Pays de Savoie (RGD 73-74)","logo":"https://wxs.ign.fr/static/logos/RGD_SAVOIE/RGD_SAVOIE.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"e-Megalis":{"href":"http://www.e-megalisbretagne.org//","attribution":"Syndicat mixte de coopération territoriale (e-Megalis)","logo":"https://wxs.ign.fr/static/logos/e-Megalis/e-Megalis.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"SIGLR":{"href":"http://www.siglr.org//","attribution":"SIGLR","logo":"https://wxs.ign.fr/static/logos/SIGLR/SIGLR.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"PPIGE":{"href":"http://www.ppige-npdc.fr/","attribution":"PPIGE","logo":"https://wxs.ign.fr/static/logos/PPIGE/PPIGE.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"FEDER2":{"href":"http://www.europe-en-france.gouv.fr/","attribution":"Fonds européen de développement économique et régional","logo":"https://wxs.ign.fr/static/logos/FEDER2/FEDER2.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"FEDER":{"href":"http://www.europe-en-france.gouv.fr/","attribution":"Fonds européen de développement économique et régional","logo":"https://wxs.ign.fr/static/logos/FEDER/FEDER.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"CRCORSE":{"href":"http://www.corse.fr//","attribution":"CRCORSE","logo":"https://wxs.ign.fr/static/logos/CRCORSE/CRCORSE.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"CNES_AUVERGNE":{"href":"http://www.cnes.fr/","attribution":"Centre national d'études spatiales (CNES)","logo":"https://wxs.ign.fr/static/logos/CNES_AUVERGNE/CNES_AUVERGNE.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"FEDER_PAYSDELALOIRE":{"href":"http://www.europe-en-paysdelaloire.eu/","attribution":"Pays-de-la-Loire","logo":"https://wxs.ign.fr/static/logos/FEDER_PAYSDELALOIRE/FEDER_PAYSDELALOIRE.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"FEDER_AUVERGNE":{"href":"http://www.europe-en-auvergne.eu/","attribution":"Auvergne","logo":"https://wxs.ign.fr/static/logos/FEDER_AUVERGNE/FEDER_AUVERGNE.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"PREFECTURE_GUADELOUPE":{"href":"www.guadeloupe.pref.gouv.fr/","attribution":"guadeloupe","logo":"https://wxs.ign.fr/static/logos/PREFECTURE_GUADELOUPE/PREFECTURE_GUADELOUPE.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"BOURGOGNE-FRANCHE-COMTE":{"href":"https://www.bourgognefranchecomte.fr/","attribution":"Auvergne","logo":"https://wxs.ign.fr/static/logos/BOURGOGNE-FRANCHE-COMTE/BOURGOGNE-FRANCHE-COMTE.gif","minZoom":13,"maxZoom":19,"constraint":[{"minZoom":13,"maxZoom":19,"bbox":[-179.5,-75,179.5,75]}]},"ASTRIUM":{"href":"http://www.geo-airbusds.com/","attribution":"Airbus Defence and Space","logo":"https://wxs.ign.fr/static/logos/ASTRIUM/ASTRIUM.gif","minZoom":13,"maxZoom":16,"constraint":[{"minZoom":13,"maxZoom":16,"bbox":[-55.01953,1.845384,-50.88867,6.053161]}]},"DITTT":{"href":"http://www.dittt.gouv.nc/portal/page/portal/dittt/","attribution":"Direction des Infrastructures, de la Topographie et des Transports Terrestres","logo":"https://wxs.ign.fr/static/logos/DITTT/DITTT.gif","minZoom":13,"maxZoom":18,"constraint":[{"minZoom":13,"maxZoom":18,"bbox":[163.47784,-22.767689,167.94624,-19.434975]}]},"CNES_ALSACE":{"href":"http://www.cnes.fr/","attribution":"Centre national d'études spatiales (CNES)","logo":"https://wxs.ign.fr/static/logos/CNES_ALSACE/CNES_ALSACE.gif","minZoom":13,"maxZoom":18,"constraint":[{"minZoom":13,"maxZoom":18,"bbox":[-179.5,-75,179.5,75]}]},"CNES_971":{"href":"http://www.cnes.fr/","attribution":"Centre national d'études spatiales (CNES)","logo":"https://wxs.ign.fr/static/logos/CNES_971/CNES_971.gif","minZoom":13,"maxZoom":18,"constraint":[{"minZoom":13,"maxZoom":18,"bbox":[-179.5,-75,179.5,75]}]},"CNES_972":{"href":"http://www.cnes.fr/","attribution":"Centre national d'études spatiales (CNES)","logo":"https://wxs.ign.fr/static/logos/CNES_972/CNES_972.gif","minZoom":13,"maxZoom":18,"constraint":[{"minZoom":13,"maxZoom":18,"bbox":[-179.5,-75,179.5,75]}]},"CNES_974":{"href":"http://www.cnes.fr/","attribution":"Centre national d'études spatiales (CNES)","logo":"https://wxs.ign.fr/static/logos/CNES_974/CNES_974.gif","minZoom":13,"maxZoom":18,"constraint":[{"minZoom":13,"maxZoom":18,"bbox":[-179.5,-75,179.5,75]}]},"CNES_975":{"href":"http://www.cnes.fr/","attribution":"Centre national d'études spatiales (CNES)","logo":"https://wxs.ign.fr/static/logos/CNES_975/CNES_975.gif","minZoom":13,"maxZoom":18,"constraint":[{"minZoom":13,"maxZoom":18,"bbox":[-179.5,-75,179.5,75]}]},"CNES_976":{"href":"http://www.cnes.fr/","attribution":"Centre national d'études spatiales (CNES)","logo":"https://wxs.ign.fr/static/logos/CNES_976/CNES_976.gif","minZoom":13,"maxZoom":18,"constraint":[{"minZoom":13,"maxZoom":18,"bbox":[-179.5,-75,179.5,75]}]},"CNES_977":{"href":"http://www.cnes.fr/","attribution":"Centre national d'études spatiales (CNES)","logo":"https://wxs.ign.fr/static/logos/CNES_977/CNES_977.gif","minZoom":13,"maxZoom":18,"constraint":[{"minZoom":13,"maxZoom":18,"bbox":[-179.5,-75,179.5,75]}]},"CNES_978":{"href":"http://www.cnes.fr/","attribution":"Centre national d'études spatiales (CNES)","logo":"https://wxs.ign.fr/static/logos/CNES_978/CNES_978.gif","minZoom":13,"maxZoom":18,"constraint":[{"minZoom":13,"maxZoom":18,"bbox":[-179.5,-75,179.5,75]}]}}},
+  "GEOGRAPHICALGRIDSYSTEMS.PLANIGN": {"server":"https://wxs.ign.fr/geoportail/wmts","layer":"GEOGRAPHICALGRIDSYSTEMS.PLANIGN","title":"Plan IGN","format":"image/jpeg","style":"normal","queryable":false,"tilematrix":"PM","minZoom":0,"maxZoom":18,"bbox":[-179.5,-75,179.5,75],"desc":"Représentation graphique des bases de données IGN.","originators":{"IGN":{"href":"http://www.ign.fr","attribution":"Institut national de l'information géographique et forestière","logo":"https://wxs.ign.fr/static/logos/IGN/IGN.gif","minZoom":0,"maxZoom":18,"constraint":[{"minZoom":10,"maxZoom":18,"bbox":[-63.37252,-21.475586,55.925865,51.31212]},{"minZoom":0,"maxZoom":9,"bbox":[-179.5,-75,179.5,75]}]}}},
+  "GEOGRAPHICALGRIDSYSTEMS.MAPS": {"server":"https://wxs.ign.fr/geoportail/wmts","layer":"GEOGRAPHICALGRIDSYSTEMS.MAPS","title":"Cartes IGN","format":"image/jpeg","style":"normal","queryable":true,"tilematrix":"PM","minZoom":0,"maxZoom":18,"bbox":[-180,-68.138855,180,80],"desc":"Cartes IGN","originators":{"IGN":{"href":"http://www.ign.fr","attribution":"Institut national de l'information géographique et forestière","logo":"https://wxs.ign.fr/static/logos/IGN/IGN.gif","minZoom":0,"maxZoom":18,"constraint":[{"minZoom":17,"maxZoom":17,"bbox":[-63.189117,-21.428364,55.84698,51.175068]},{"minZoom":18,"maxZoom":18,"bbox":[-63.189068,-21.428364,55.846638,51.175068]},{"minZoom":7,"maxZoom":8,"bbox":[-178.20573,-68.138855,144.84375,51.909786]},{"minZoom":13,"maxZoom":14,"bbox":[-178.20573,-67.101425,142.03836,51.44377]},{"minZoom":11,"maxZoom":12,"bbox":[-178.20573,-67.101425,142.03836,51.444122]},{"minZoom":9,"maxZoom":10,"bbox":[-178.20573,-68.138855,144.84375,51.444016]},{"minZoom":15,"maxZoom":16,"bbox":[-178.20573,-46.502903,77.60037,51.175068]},{"minZoom":0,"maxZoom":6,"bbox":[-180,-60,180,80]}]},"NCL-DITTT":{"href":"http://www.dittt.gouv.nc/portal/page/portal/dittt","attribution":"Direction des Infrastructures, de la Topographie et des Transports Terrestres du gouvernement de la Nouvelle-Calédonie","logo":"https://wxs.ign.fr/static/logos/NCL-DITTT/NCL-DITTT.gif","minZoom":8,"maxZoom":16,"constraint":[{"minZoom":8,"maxZoom":10,"bbox":[163.47784,-22.854631,168.24048,-19.402704]},{"minZoom":11,"maxZoom":13,"bbox":[163.47784,-22.972307,168.24327,-19.494438]},{"minZoom":14,"maxZoom":15,"bbox":[164.53125,-22.75592,168.22266,-20.303417]},{"minZoom":16,"maxZoom":16,"bbox":[163.47784,-22.79525,168.19109,-19.494438]}]}}},
+  "TRANSPORTNETWORKS.ROADS": {"server":"https://wxs.ign.fr/geoportail/wmts","layer":"TRANSPORTNETWORKS.ROADS","title":"Routes","format":"image/png","style":"normal","queryable":false,"tilematrix":"PM","minZoom":6,"maxZoom":18,"bbox":[-63.969162,-21.49687,55.964417,71.584076],"desc":"Affichage du réseau routier français et européen.","originators":{"IGN":{"href":"http://www.ign.fr","attribution":"Institut national de l'information géographique et forestière","logo":"https://wxs.ign.fr/static/logos/IGN/IGN.gif","minZoom":6,"maxZoom":18,"constraint":[{"minZoom":15,"maxZoom":18,"bbox":[-63.37252,-21.475586,55.925865,51.31212]},{"minZoom":6,"maxZoom":14,"bbox":[-63.969162,-21.49687,55.964417,71.584076]}]}}},
 };
 
 /** Load capabilities from the service
@@ -152,7 +165,8 @@ ol_layer_Geoportail.capabilities = {
 ol_layer_Geoportail.loadCapabilities = function(gppKey, all) {
   var onSuccess = function() {}
   var onError = function() {}
-  var onFinally = function() {}
+  var onFinally = function() {};
+
   this.getCapabilities(gppKey,all).then(function(c) {
     ol_layer_Geoportail.capabilities = c;
     onSuccess(c);
@@ -162,17 +176,21 @@ ol_layer_Geoportail.loadCapabilities = function(gppKey, all) {
     onFinally(c);
   });
 
-  return {
+  var response = {
     then: function (callback) {
       if (typeof(callback)==='function') onSuccess = callback;
+      return response;
     },
     catch: function (callback) {
       if (typeof(callback)==='function') onError = callback;
+      return response;
     },
     finally: function (callback) {
       if (typeof(callback)==='function') onFinally = callback;
-    },
+      return response;
+    }
   }
+  return response;
 };
 
 /** Get Key capabilities
@@ -187,10 +205,10 @@ ol_layer_Geoportail.getCapabilities = function(gppKey) {
 
   var geopresolutions = [156543.03390625,78271.516953125,39135.7584765625,19567.87923828125,9783.939619140625,4891.9698095703125,2445.9849047851562,1222.9924523925781,611.4962261962891,305.74811309814453,152.87405654907226,76.43702827453613,38.218514137268066,19.109257068634033,9.554628534317017,4.777314267158508,2.388657133579254,1.194328566789627,0.5971642833948135,0.29858214169740677,0.14929107084870338];
   // Transform resolution to zoom
-	function getZoom(res) {
+  function getZoom(res) {
     res = Number(res) * 0.000281;
-		for (var r=0; r<geopresolutions.length; r++) 
-			if (res>geopresolutions[r]) return r;
+    for (var r=0; r<geopresolutions.length; r++) 
+      if (res>geopresolutions[r]) return r;
   }
   // Merge constraints 
   function mergeConstraints(ori) {
@@ -205,11 +223,11 @@ ol_layer_Geoportail.getCapabilities = function(gppKey) {
         }
         if (!bok) continue;
         if (ori.constraint[i].maxZoom == ori.constraint[j].minZoom 
-         || ori.constraint[j].maxZoom == ori.constraint[i].minZoom 
-         || ori.constraint[i].maxZoom+1 == ori.constraint[j].minZoom 
-         || ori.constraint[j].maxZoom+1 == ori.constraint[i].minZoom
-         || ori.constraint[i].minZoom-1 == ori.constraint[j].maxZoom
-         || ori.constraint[j].minZoom-1 == ori.constraint[i].maxZoom) {
+        || ori.constraint[j].maxZoom == ori.constraint[i].minZoom 
+        || ori.constraint[i].maxZoom+1 == ori.constraint[j].minZoom 
+        || ori.constraint[j].maxZoom+1 == ori.constraint[i].minZoom
+        || ori.constraint[i].minZoom-1 == ori.constraint[j].maxZoom
+        || ori.constraint[j].minZoom-1 == ori.constraint[i].maxZoom) {
           ori.constraint[j].maxZoom = Math.max(ori.constraint[i].maxZoom, ori.constraint[j].maxZoom);
           ori.constraint[j].minZoom = Math.min(ori.constraint[i].minZoom, ori.constraint[j].minZoom);
           ori.constraint.splice(i,1);
@@ -240,6 +258,8 @@ ol_layer_Geoportail.getCapabilities = function(gppKey) {
           layer: l.getElementsByTagName('Name')[0].innerHTML,
           title: l.getElementsByTagName('Title')[0].innerHTML,
           format: l.getElementsByTagName('Format')[0].innerHTML,
+          style: l.getElementsByTagName('Style')[0].getElementsByTagName('Name')[0].innerHTML,
+          queryable: (l.attributes.queryable.value==='1'),
           tilematrix: 'PM',
           minZoom: getZoom(l.getElementsByTagName('sld:MaxScaleDenominator')[0].innerHTML),
           maxZoom: getZoom(l.getElementsByTagName('sld:MinScaleDenominator')[0].innerHTML),
@@ -251,27 +271,27 @@ ol_layer_Geoportail.getCapabilities = function(gppKey) {
         for (var k=0, o; o=origin[k]; k++) {
           var ori = service.originators[o.attributes['name'].value] = {
             href: o.getElementsByTagName('gpp:URL')[0].innerHTML,
-						attribution: o.getElementsByTagName('gpp:Attribution')[0].innerHTML,
-						logo: o.getElementsByTagName('gpp:Logo')[0].innerHTML,
-						minZoom: 20,
-						maxZoom: 0,
-						constraint: []
+            attribution: o.getElementsByTagName('gpp:Attribution')[0].innerHTML,
+            logo: o.getElementsByTagName('gpp:Logo')[0].innerHTML,
+            minZoom: 20,
+            maxZoom: 0,
+            constraint: []
           };
           // Scale contraints
           var constraint = o.getElementsByTagName('gpp:Constraint');
-					for (var j=0, c; c=constraint[j]; j++) {
+          for (var j=0, c; c=constraint[j]; j++) {
             var zmax = getZoom(c.getElementsByTagName('sld:MinScaleDenominator')[0].innerHTML);
-						var zmin = getZoom(c.getElementsByTagName('sld:MaxScaleDenominator')[0].innerHTML);
-						if (zmin > ori.maxZoom) ori.maxZoom = zmin;
-						if (zmin < ori.minZoom) ori.minZoom = zmin;
-						if (zmax>ori.maxZoom) ori.maxZoom = zmax;
-						if (zmax<ori.minZoom) ori.minZoom = zmax;
+            var zmin = getZoom(c.getElementsByTagName('sld:MaxScaleDenominator')[0].innerHTML);
+            if (zmin > ori.maxZoom) ori.maxZoom = zmin;
+            if (zmin < ori.minZoom) ori.minZoom = zmin;
+            if (zmax>ori.maxZoom) ori.maxZoom = zmax;
+            if (zmax<ori.minZoom) ori.minZoom = zmax;
 
-						ori.constraint.push({
+            ori.constraint.push({
               minZoom: zmin,
-							maxZoom: zmax,
-							bbox: JSON.parse('['+c.getElementsByTagName('gpp:BoundingBox')[0].innerHTML+']')
-						});
+              maxZoom: zmax,
+              bbox: JSON.parse('['+c.getElementsByTagName('gpp:BoundingBox')[0].innerHTML+']')
+            });
           }
           // Merge constraints
           mergeConstraints(ori)

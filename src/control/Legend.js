@@ -100,9 +100,8 @@ ol_control_Legend.prototype.addRow = function(row) {
   this.refresh();
 };
 
-/** Add a new row to the legend
- * @param {*} options a list of parameters 
- *  @param {} options.
+/** Remove a row from the legend
+ *  @param {int} index
  */
 ol_control_Legend.prototype.removeRow = function(index) {
   this._rows.splice(index,1);
@@ -229,6 +228,7 @@ ol_control_Legend.prototype.getStyleImage = function(options, theCanvas, row) {
   }
   if (feature) {
     style = feature.getStyle();
+    if (typeof(style)==='function') style = style(feature);
     if (!style) {
       style = typeof(this._style) === 'function' ? this._style(feature) : this._style || [];
     }

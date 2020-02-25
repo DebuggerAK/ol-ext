@@ -12,10 +12,9 @@ import ol_ext_element from '../util/element'
 /** Template attributes for popup
  * @typedef {Object} TemplateAttributes
  * @property {string} title
- * @property {function} format a function that takes an attribute and returns it formated
+ * @property {function} format a function that takes an attribute and a feature and returns the formated attribute
  * @property {string} before string to instert before the attribute (prefix)
  * @property {string} after string to instert after the attribute (sudfix)
- * @property {function} value a function that takes feature and a value and returns a value (calculated attributes)
  * @property {boolean|function} visible boolean or a function (feature, value) that decides the visibility of a attribute entry
  */
 
@@ -143,8 +142,8 @@ ol_Overlay_PopupFeature.prototype._getHtml = function(feature) {
       var a = atts[att];
       var content, val = feature.get(att);
       // Get calculated value
-      if (typeof(a.value)==='function') {
-        val = a.value(feature, val);
+      if (typeof(a.format)==='function') {
+        val = a.format(val, feature);
       }
 
       // Is entry visible?
@@ -165,7 +164,7 @@ ol_Overlay_PopupFeature.prototype._getHtml = function(feature) {
             src: val
           });
         } else {
-          content = (a.before||'') + (a.format ? a.format(val) : val) + (a.after||'');
+          content = (a.before||'') + val + (a.after||'');
           var maxc = this.get('maxChar') || 200;
           if (typeof(content) === 'string' && content.length>maxc) content = content.substr(0,maxc)+'[...]';
         }
@@ -195,21 +194,31 @@ ol_Overlay_PopupFeature.prototype._getHtml = function(feature) {
   // Counter
   if (this._features.length > 1) {
     var div = ol_ext_element.create('DIV', { className: 'ol-count', parent: html });
-    ol_ext_element.create('DIV', { className: 'ol-prev', parent: div })
-      .addEventListener('click', function() {
+    ol_ext_element.create('DIV', { 
+      className: 'ol-prev', 
+      parent: div,
+      click: function() {
         this._count--;
         if (this._count<1) this._count = this._features.length;
         html = this._getHtml(this._features[this._count-1]);
-        ol_Overlay_Popup.prototype.show.call(this, this.getPosition(), html);
-      }.bind(this));
+        setTimeout(function() { 
+          ol_Overlay_Popup.prototype.show.call(this, this.getPosition(), html); 
+        }.bind(this), 350 );
+      }.bind(this)
+    });
     ol_ext_element.create('TEXT', { html:this._count+'/'+this._features.length, parent: div });
-    ol_ext_element.create('DIV', { className: 'ol-next', parent: div })
-      .addEventListener('click', function() {
+    ol_ext_element.create('DIV', { 
+      className: 'ol-next', 
+      parent: div,
+      click: function() {
         this._count++;
         if (this._count>this._features.length) this._count = 1;
         html = this._getHtml(this._features[this._count-1]);
-        ol_Overlay_Popup.prototype.show.call(this, this.getPosition(), html);
-      }.bind(this));
+        setTimeout(function() { 
+          ol_Overlay_Popup.prototype.show.call(this, this.getPosition(), html); 
+        }.bind(this), 350 );
+      }.bind(this)
+    });
   }
   // Use select interaction
   if (this._select) {

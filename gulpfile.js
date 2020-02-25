@@ -52,7 +52,7 @@ function transform() {
         content = content.replace(/\blet\b/g, 'var');
         content = content.replace(/\bconst\b/g, 'var');
         // return content
-        file.contents = new Buffer(content);
+        file.contents = Buffer.from(content);// new Buffer(content);
       }
       return callback(null, file);
     }
@@ -83,8 +83,10 @@ gulp.task('css', function () {
     "./src/filter/*.css",
     "./src/interaction/*.css",
     "./src/layer/*.css",
+    "./src/map/*.css",
     "./src/overlay/*.css", 
     "./src/style/*.css",
+    "./src/util/*.css",
     "./src/utils/*.css"
     ])
   .pipe(autoprefixer('last 2 versions'))
@@ -97,8 +99,10 @@ gulp.task('css', function () {
     "./src/filter/*.css",
     "./src/interaction/*.css",
     "./src/layer/*.css",
+    "./src/map/*.css",
     "./src/overlay/*.css", 
     "./src/style/*.css",
+    "./src/util/*.css",
     "./src/utils/*.css"
     ])
   .pipe(autoprefixer('last 2 versions'))
@@ -110,15 +114,18 @@ gulp.task('css', function () {
 // Build js
 gulp.task("js", function() {
   gulp.src([
-    "./src/util/ext.js", "./src/util/*.js",
+    "!./src/util/getVectorContext.js", "./src/util/ext.js", "./src/util/*.js",
     "./src/control/CanvasBase.js","./src/control/SelectBase.js","./src/control/Search.js","./src/control/SearchJSON.js","./src/control/SearchPhoton.js","./src/control/SearchGeoportail.js",
     "./src/control/LayerSwitcher.js", "./src/control/*.js", 
     "!./src/control/PirateMap.js", "!./src/control/Cloud.js",
     "./src/featureanimation/FeatureAnimation.js", "./src/featureanimation/*.js",
     "./src/filter/Base.js", "./src/filter/Mask.js", "./src/filter/*.js",
+    "./src/format/*.js",
     "./src/interaction/*.js",
     "./src/source/*.js",
     "./src/layer/*.js",
+    "./src/map/*.js",
+    "./src/particule/*.js",
     "./src/overlay/Popup.js", "./src/overlay/*.js",
     "./src/geom/*.js",
     "./src/render/*.js",
@@ -181,7 +188,7 @@ gulp.task("extrajs", function() {
 
 // Build files to be used individually
 gulp.task("lib", function() {
-  var src = ['control','featureanimation','filter','geom','interaction','layer','overlay','render','source','style','util','utils'];
+  var src = ['control','featureanimation','filter','format','geom','interaction','layer','overlay','render','source','style','util','utils'];
   for (var i=0; i<src.length; i++) {
     gulp.src("./src/"+src[i]+"/*.js")
       .pipe(transform())
@@ -211,10 +218,13 @@ gulp.task ("postpublish", function(){
       "./control",
       "./featureanimation",
       "./filter",
+      "./format",
       "./geom",
       "./interaction",
       "./layer",
+      "./map",
       "./overlay",
+      "./particule",
       "./render",
       "./source",
       "./style",

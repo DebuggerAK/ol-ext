@@ -26,6 +26,7 @@ var ol_source_DFCI = function(options) {
   options.strategy =  function(extent, resolution) {
     if (this.resolution && this.resolution != resolution){
       this.clear();
+      this.refresh();
     }
     return [extent];
   }
@@ -147,3 +148,5 @@ ol_source_DFCI.prototype._getFeatures = function (level, extent, projection) {
   }
   return features
 };
+
+export default ol_source_DFCI

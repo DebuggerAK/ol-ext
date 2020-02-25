@@ -3,6 +3,7 @@
 <head>
   <title>ol-ext</title>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1" />
   
   <meta name="description" content="Cool extensions to use with Openlayers (ol)." />
   <meta name="keywords" content="ol,extension,canvas,3D,animation,layer,selection,control,openlayers,popup" />
@@ -41,6 +42,12 @@
     z-index: 1;
     background-color: #1f6b75;
     color: white;
+    height: 4em;
+    overflow: hidden;
+  }
+  .navbar p {
+    display: inline-block;
+    margin: 0;
   }
   .navbar img {
     height:1.5em;
@@ -50,10 +57,16 @@
     display: inline-block;
     font-size:1.5em;
     margin: 0.5em;
+    vertical-align: middle;
   }
   h2 {
     clear:both;
     margin:1em 0 0;
+  }
+  input[type="search"] {
+    font-size: 1em;
+    padding: .3em 1em;
+    border-radius: 1em;;
   }
   .container {
     width:1170px;
@@ -89,6 +102,21 @@
       display: none;
     }
   }
+  @media (max-width: 500px) {
+    .navbar {
+      height: 6.5em;
+    }
+    .navbar p {
+      display: block;
+    }
+    #examples {
+      margin-top: 7em;
+    }
+    .navbar .news {
+      display: none;
+    }
+  }
+
   .example,
   .desc {
     background-color: #f5f5f5;
@@ -245,8 +273,10 @@
       <h1><img src="http://openlayers.org/en/master/examples/resources/logo-70x70.png">&nbsp;ol-ext<span>: 
         Extensions for OpenLayers (ol)</span>
       </h1>
-      <input type="search" placeholder="Search" class="search-query" id="keywords" name="q">
-      <span id="count"></span>
+      <p>
+        <input type="search" placeholder="Search" class="search-query" id="keywords" name="q">
+        <span id="count"></span>
+      </p>
     </div>
   </header>
   <div id="examples">
@@ -311,7 +341,7 @@
           <strong>Statistic charts style + values</strong><br>
         </a>
         <p class="description">
-          This example show how to show values using a <i>ol.style.Chart</i>.
+          This example shows how to display values using a <i>ol.style.Chart</i>.
         </p>
         <p class="tag">style, vector, statistic, chart, pie, text</p>
       </div>
@@ -373,7 +403,7 @@
           <strong>Hash lines style</strong><br>
         </a>
         <p class="description">
-          This example use the <i>ol.geom.offsetCoords()</i> function to draw an offset line with a dash symbol.
+          This example uses the <i>ol.geom.offsetCoords()</i> function to draw an offset line with a dash symbol.
         </p>
         <p class="tag">style, vector, hash, stroke, offset</p>
       </div>
@@ -413,7 +443,7 @@
         <a class="mainlink" href="examples/animation/map.featureanimation.select.html">
           <strong>Feature animation with select</strong><br>
         </a>
-        <p class="description">This example show how to use a transparent style to let the features selectable when animated.</p>
+        <p class="description">This example shows how to use a transparent style to let the features selectable when animated.</p>
         <p class="tag">map, feature, animation, bounce, drop, select</p>
       </div>
 
@@ -421,7 +451,7 @@
         <a class="mainlink" href="examples/animation/map.featureanimation.path.html">
           <strong>Animate features along a path</strong><br>
         </a>
-        <p class="description">This example animates deatures along a path.</p>
+        <p class="description">This example animates features along a path.</p>
         <p class="tag">map, feature, animation, path</p>
       </div>
 
@@ -531,7 +561,7 @@
         <a class="mainlink" href="examples/control/map.control.overlay.menu.html">
           <strong>Overlay menu</strong><br>
         </a>
-        <p class="description">The ovelay control can be used to display a menu on to of the map.</p>
+        <p class="description">The overlay control can be used to display a menu on to of the map.</p>
         <p class="tag">overlay, control, menu</p>
       </div>
 
@@ -1039,7 +1069,7 @@
         <a class="mainlink" href="examples/popup/map.control.overlay.html">
           <strong>Overlay control</strong><br>
         </a>
-        <p class="description">The ovelay control can be used to display information on to of the map.</p>
+        <p class="description">The overlay control can be used to display information on to of the map.</p>
         <p class="tag">popup, overlay, animation</p>
       </div>
 
@@ -1109,6 +1139,14 @@
         <p class="tag">source, dfci, grid, index</p>
       </div>
 
+      <div class="example" data-date="2019-11-30">
+        <a class="mainlink" href="examples/layer/map.daynight.html">
+          <strong>A source to display day/night on a map.</strong><br>
+        </a>
+        <p class="description">The ol/source/DayNight display night and day on a map.</p>
+        <p class="tag">source, night, day</p>
+      </div>
+
       <div class="example" data-date="2019-06-05">
         <a class="mainlink" href="examples/layer/map.layer.geoportail.html">
           <strong>French IGN's layer and source</strong><br>
@@ -1134,6 +1172,14 @@
           <a href="https://wiki.openstreetmap.org/wiki/Overpass_API">Overpass API</a> to load <a href="">OSM</a> features.
         </p>
         <p class="tag">layer, vector, OSM, Overpass</p>
+      </div>
+
+      <div class="example" data-date="2019-10-24">
+        <a class="mainlink" href="examples/layer/map.source.georss.html">
+          <strong>GeoRSS source</strong><br>
+        </a>
+        <p class="description"><i>ol/source/GeoRSS</i> is a vector source to load a <a href="http://www.georss.org/">GeoRSS feed</a>.</p>
+        <p class="tag">source, layer, vector, GeoRSS</p>
       </div>
 
       <div class="example">
@@ -1231,37 +1277,47 @@
 
   <h2>Geometry</h2>
     <div>
-        <div class="example">
-          <a class="mainlink" href="examples/geom/map.geom.cspline.html">
-            <strong>Cardinal spline</strong><br>
-          </a>
-          <p class="description">
-            The <i>ol.geom.Geometry.cspline()</i> function smooth lines by using cardinal splines (canonical spline)
-            to draw smooth curves that goes through the points.
-          </p>
-          <p class="tag">geom, linestring, spline, smooth, curve</p>
-        </div>
+      <div class="example">
+        <a class="mainlink" href="examples/geom/map.geom.cspline.html">
+          <strong>Cardinal spline</strong><br>
+        </a>
+        <p class="description">
+          The <i>ol.geom.Geometry.cspline()</i> function smooth lines by using cardinal splines (canonical spline)
+          to draw smooth curves that goes through the points.
+        </p>
+        <p class="tag">geom, linestring, spline, smooth, curve</p>
+      </div>
+
+      <div class="example" data-date="2019-08-16">
+        <a class="mainlink" href="examples/geom/map.geom.greatcircle.html" >
+          <strong>Great circle track</strong><br>
+        </a>
+        <p class="description">
+        The <i>ol.sphere.greatCircleTrack()</i> function computes a great circle geometry. 
+        </p>
+        <p class="tag">geom, track, great circle, sphere</p>
+      </div>
 
       <div class="example">
-          <a class="mainlink" href="examples/geom/map.convexhull.html">
-            <strong>Convex Hull</strong><br>
-          </a>
-          <p class="description">
-          The <i>ol.coordinate.convexHull()</i> function calculate a convex hull or convex envelope, 
-          ie. the smallest polygon that contains all points of a set. 
-          </p>
-          <p class="tag">geom, polygon, convex hull, envelope</p>
-        </div>
+        <a class="mainlink" href="examples/geom/map.convexhull.html">
+          <strong>Convex Hull</strong><br>
+        </a>
+        <p class="description">
+        The <i>ol.coordinate.convexHull()</i> function calculates a convex hull or convex envelope, 
+        ie. the smallest polygon that contains all points of a set. 
+        </p>
+        <p class="tag">geom, polygon, convex hull, envelope</p>
+      </div>
 
       <div class="example">
-          <a class="mainlink" href="examples/geom/map.cluster.convexhull.html">
-            <strong>Cluster envelope</strong><br>
-          </a>
-          <p class="description">
-          Uses convex hull to display the envelope of the points inside a cluster when cusor hovers the cluster.
-          </p>
-          <p class="tag">geom, polygon, convex hull, envelope</p>
-        </div>
+        <a class="mainlink" href="examples/geom/map.cluster.convexhull.html">
+          <strong>Cluster envelope</strong><br>
+        </a>
+        <p class="description">
+        Uses convex hull to display the envelope of the points inside a cluster when cusor hovers the cluster.
+        </p>
+        <p class="tag">geom, polygon, convex hull, envelope</p>
+      </div>
 
     </div>
 
@@ -1319,28 +1375,9 @@
 
     </div>
 
+
   <h2>Miscancellous</h2>
     <div>
-      <div class="example">
-        <a class="mainlink" href="examples/misc/exif2geojson.html">
-          <strong>Exif2GeoJSON</strong><br>
-        </a>
-        <p class="description">
-          A usefull tool to make a GeoJSON file with all of the found GPS points in a list of images.
-        </p>
-        <p class="tag">exif, tag, image, geojson</p>
-      </div>
-
-      <div class="example" data-date="2019-03-02">
-        <a class="mainlink" href="examples/misc/geojson2csv.html">
-          <strong>GeoJSON2CSV</strong><br>
-        </a>
-        <p class="description">
-          Convert a GeoJSON file to CSV.
-        </p>
-        <p class="tag">csv, geojson</p>
-      </div>
-
       <div class="example" data-date="2019-06-08">
         <a class="mainlink" href="examples/control/map.control.status.html">
           <strong>Status control</strong><br>
@@ -1349,6 +1386,16 @@
             A control to show debug information on the map.
         </p>
         <p class="tag">control, status, overlay, debug</p>
+      </div>
+
+      <div class="example" data-date="2019-07-24">
+        <a class="mainlink" href="examples/misc/map.dialog.html">
+          <strong>Dialog control</strong><br>
+        </a>
+        <p class="description">
+            A control to display dialogs on a map.
+        </p>
+        <p class="tag">control, dialog, overlay, form</p>
       </div>
 
       <div class="example">
@@ -1378,6 +1425,14 @@
         </a>
         <p class="description">The flashlight interaction add a flashlight effect on mouse move.</p>
         <p class="tag">interaction, effect, light</p>
+      </div>
+
+      <div class="example" data-date="2020-01-25">
+        <a class="mainlink" href="examples/misc/map.animatedcanvas.html">
+          <strong>Animated Overlay</strong><br>
+        </a>
+        <p class="description">The <i>ol.Overlay.AnimatedCanvas</i> is an overlay to play animations on top of the map.</p>
+        <p class="tag">control, effect, rain, snow, clouds, birds, animation</p>
       </div>
 
       <div class="example">
@@ -1420,7 +1475,40 @@
         <p class="tag">synchronization, map, window, comparison</p>
       </div>
     </div>
-  
+
+  <h2>Tools</h2>
+    <div>
+      <div class="example">
+        <a class="mainlink" href="examples/misc/exif2geojson.html">
+          <strong>Exif2GeoJSON</strong><br>
+        </a>
+        <p class="description">
+          A usefull tool to make a GeoJSON file with all of the found GPS points in a list of images.
+        </p>
+        <p class="tag">exif, tag, image, geojson, tool</p>
+      </div>
+
+      <div class="example" data-date="2019-03-02">
+        <a class="mainlink" href="examples/misc/geojson2csv.html">
+          <strong>GeoJSON2CSV</strong><br>
+        </a>
+        <p class="description">
+          Convert a GeoJSON file to CSV.
+        </p>
+        <p class="tag">csv, geojson, tool</p>
+      </div>
+
+      <div class="example" data-date="2019-10-16">
+        <a class="mainlink" href="examples/misc/csv2geojson.html">
+          <strong>CSV2GeoJSON</strong><br>
+        </a>
+        <p class="description">
+          Convert a CSV file to GeoJSON.
+        </p>
+        <p class="tag">csv, geojson, tool</p>
+      </div>
+    </div>
+
   <h2>Full map</h2>
     <div>
       <div class="example">
@@ -1428,7 +1516,7 @@
           <strong>Pirate map.</strong><br>
         </a>
         <p class="description">
-          This example show how to combine a color filter, with a parchment texture filter, 
+          This example shows how to combine a color filter, with a parchment texture filter, 
           a compass control and a graticule control to create an old map effect. 
         </p>
         <p class="tag">control, canvas, pirate, graticule, compass, effect</p>

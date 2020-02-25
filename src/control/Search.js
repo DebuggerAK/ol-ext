@@ -4,6 +4,7 @@
 */
 import ol_ext_inherits from '../util/ext'
 import ol_control_Control from 'ol/control/Control'
+import {unByKey as ol_Observable_unByKey} from 'ol/Observable'
 
 import ol_ext_element from '../util/element'
 
@@ -22,6 +23,7 @@ import ol_ext_element from '../util/element'
  *  @param {Element | string | undefined} options.target Specify a target if you want the control to be rendered outside of the map's viewport.
  *  @param {string | undefined} options.label Text label to use for the search button, default "search"
  *  @param {string | undefined} options.placeholder placeholder, default "Search..."
+ *  @param {boolean | undefined} options.reverse enable reverse geocoding, default false
  *  @param {string | undefined} options.inputLabel label for the input, default none
  *  @param {string | undefined} options.noCollapse prevent collapsing on input blur, default false
  *  @param {number | undefined} options.typing a delay on each typing to start searching (ms) use -1 to prevent autocompletion, default 300.
@@ -76,6 +78,7 @@ var ol_control_Search = function(options) {
   var input = this._input = document.createElement("INPUT");
   input.setAttribute("type", "search");
   input.setAttribute("class", "search");
+  input.setAttribute("autocomplete", "off");
   input.setAttribute("placeholder", options.placeholder||"Search...");
   input.addEventListener("change", function(e) {
     self.dispatchEvent({ type:"change:input", input:e, value:input.value });
@@ -137,13 +140,40 @@ var ol_control_Search = function(options) {
   input.addEventListener("input", doSearch);
   if (!options.noCollapse) {
     input.addEventListener('blur', function() {
-      setTimeout(function(){ element.classList.add('ol-collapsed') }, 200);
-    });
+      setTimeout(function(){ 
+        if (input !== document.activeElement) {
+          element.classList.add('ol-collapsed');
+          this.set('reverse', false);
+          element.classList.remove('ol-revers');
+        }
+      }.bind(this), 200);
+    }.bind(this));
     input.addEventListener('focus', function() {
-      element.classList.remove('ol-collapsed');
-    });
+      if (!this.get('reverse')) {
+        element.classList.remove('ol-collapsed');
+        element.classList.remove('ol-revers');
+      }
+    }.bind(this));
   }
   element.appendChild(input);
+  // Reverse geocode
+  if (options.reverse) {
+    var reverse = ol_ext_element.create('BUTTON', {
+      tyoe: 'button',
+      class: 'ol-revers',
+      title: 'click on the map',
+      click: function() {
+        if (!this.get('reverse')) {
+          this.set('reverse', !this.get('reverse'));
+          input.focus();
+          element.classList.add('ol-revers');
+        } else {
+          this.set('reverse', false);
+        }
+      }.bind(this)
+    });
+    element.appendChild(reverse);
+  }
   // Autocomplete list
   var ul = document.createElement('UL');
   ul.classList.add('autocomplete');
@@ -167,6 +197,24 @@ var ol_control_Search = function(options) {
   this.drawList_();
 };
 ol_ext_inherits(ol_control_Search, ol_control_Control);
+
+/**
+ * Remove the control from its current map and attach it to the new map.
+ * Subclasses may set up event handlers to get notified about changes to
+ * the map here.
+ * @param {ol.Map} map Map.
+ * @api stable
+ */
+ol_control_Search.prototype.setMap = function (map) {
+  if (this._listener) ol_Observable_unByKey(this._listener);
+	this._listener = null;
+
+  ol_control_Control.prototype.setMap.call(this, map);
+
+  if (map) {
+		this._listener = map.on('click', this._handleClick.bind(this));
+	}
+};
 
 /** Get the input field
 *	@return {Element} 
@@ -192,20 +240,34 @@ ol_control_Search.prototype.search = function () {
   this._triggerCustomEvent('search', search);
 };
 
+/** Reverse geocode
+ * @param {Object} event
+ *  @param {ol.coordinate} event.coordinate
+ * @private
+ */
+ol_control_Search.prototype._handleClick = function (e) {
+  if (this.get('reverse')) {
+    document.activeElement.blur();
+    this.reverseGeocode(e.coordinate);
+  }
+};
+
+/** Reverse geocode
+ * @param {ol.coordinate} coord
+ * @param {function | undefined} cback a callback function, default trigger a select event
+ * @api
+ */
+ol_control_Search.prototype.reverseGeocode = function (/*coord, cback*/) {
+  // this._handleSelect(f);
+};
+
 /** Trigger custom event on elemebt
  * @param {*} eventName 
  * @param {*} element 
  * @private
  */
 ol_control_Search.prototype._triggerCustomEvent = function (eventName, element) {
-  var event;
-  if (window.CustomEvent) {
-    event = new CustomEvent(eventName);
-  } else {
-    event = document.createEvent("CustomEvent");
-    event.initCustomEvent(eventName, true, true, {});
-  }
-  element.dispatchEvent(event);
+  ol_ext_element.dispatchEvent(eventName, element);
 };
 
 /** Set the input value in the form (for initialisation purpose)
@@ -221,18 +283,19 @@ ol_control_Search.prototype.setInput = function (value, search) {
 
 /** A ligne has been clicked in the menu > dispatch event
 *	@param {any} f the feature, as passed in the autocomplete
-*	@api
+*	@api * @param {boolean} reverse true if reverse geocode
 */
-ol_control_Search.prototype.select = function (f) {
-  this.dispatchEvent({ type:"select", search:f });
+ol_control_Search.prototype.select = function (f, reverse) {
+  this.dispatchEvent({ type:"select", search:f, reverse: !!reverse });
 };
 
 /**
  * Save history and select
  * @param {*} f 
+ * @param {boolean} reverse true if reverse geocode
  * @private
  */
-ol_control_Search.prototype._handleSelect = function (f) {
+ol_control_Search.prototype._handleSelect = function (f, reverse) {
   if (!f) return;
   // Save input in history
   var hist = this.get('history');
@@ -258,9 +321,12 @@ ol_control_Search.prototype._handleSelect = function (f) {
   } 
   this.saveHistory();
   // Select feature
-  this.select(f);
+  this.select(f, reverse);
   //this.drawList_();
 };
+
+/** Current history */
+ol_control_Search.prototype._history = {};
 
 /** Save history (in the localstorage)
  */
@@ -277,10 +343,15 @@ ol_control_Search.prototype.saveHistory = function () {
 /** Restore history (from the localstorage) 
  */
 ol_control_Search.prototype.restoreHistory = function () {
-  try {
-    this.set('history', JSON.parse(localStorage["ol@search-"+this._classname]) );
-  } catch(e) {
-    this.set('history', []);
+  if (this._history[this._classname]) {
+    this.set('history', this._history[this._classname]);
+  } else {
+    try {
+      this._history[this._classname] = JSON.parse(localStorage["ol@search-"+this._classname]);
+      this.set('history', this._history[this._classname]);
+    } catch(e) {
+      this.set('history', []);
+    }
   }
 };
 

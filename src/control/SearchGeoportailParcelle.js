@@ -162,11 +162,9 @@ ol_control_SearchGeoportailParcelle.prototype.activateParcelle = function(b) {
  * @private
  */
 ol_control_SearchGeoportailParcelle.prototype.autocompleteParcelle = function() {
-  var self = this;
-
   // Add 0 to fit the format
-  function complete (s, n, c)
-  {	if (!s) return s;
+  function complete (s, n, c) {
+    if (!s) return s;
     c = c || "0";
     while (s.length < n) s = c+s;
     return s.replace(/\*/g,'_');
@@ -182,7 +180,21 @@ ol_control_SearchGeoportailParcelle.prototype.autocompleteParcelle = function() 
   var section = complete (this._inputParcelle.section.value, 2);
   var numero = complete (this._inputParcelle.numero.value, 4, "0");
   var search = commune + (prefix||'___') + (section||"__") + (numero ?  numero : section ? "____":"0001");
+  this.searchParcelle(search, 
+    function(jsonResp) {
+      this._listParcelle(jsonResp);
+    }.bind(this),
+    function() {
+      console.log('oops')
+    })
+};
 
+/** Send search request for a parcelle number
+ * @param {string} search search parcelle number
+ * @param {function} success callback function called on success
+ * @param {function} error callback function called on error
+ */
+ol_control_SearchGeoportailParcelle.prototype.searchParcelle = function(search, success /*, error */) {
   // Request
   var request = '<?xml version="1.0" encoding="UTF-8"?>'
   +'<XLS xmlns:xls="http://www.opengis.net/xls" xmlns:gml="http://www.opengis.net/gml" xmlns="http://www.opengis.net/xls" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="1.2" xsi:schemaLocation="http://www.opengis.net/xls http://schemas.opengis.net/ols/1.2/olsAll.xsd">'
@@ -195,31 +207,33 @@ ol_control_SearchGeoportailParcelle.prototype.autocompleteParcelle = function() 
       +'</GeocodeRequest>'
     +'</Request>'
   +'</XLS>'
-  var url = this.get('url').replace('ols/apis/completion','geoportail/ols?xls=')+encodeURIComponent(request);
   // Geocode
-  this.ajax(url, function(resp) {
-    // XML to JSON
-    var parser = new DOMParser();
-    var xmlDoc = parser.parseFromString(resp.response,"text/xml");
-    var parcelles = xmlDoc.getElementsByTagName('GeocodedAddress');
-    var jsonResp = []
-    for (var i=0, parc; parc= parcelles[i]; i++) {
-      var node = parc.getElementsByTagName('gml:pos')[0] || parc.getElementsByTagName('pos')[0];
-      var p = node.childNodes[0].nodeValue.split(' ');
-      var att = parc.getElementsByTagName('Place');
-      var json = { 
-        lon: Number(p[1]), 
-        lat: Number(p[0])
-      };
-      for (var k=0, a; a=att[k]; k++) {
-        json[a.attributes.type.value] = a.childNodes[0].nodeValue;
+  this.ajax(
+    this.get('url').replace('ols/apis/completion','geoportail/ols'), 
+    { xls: request },
+    function(xml) {
+      // XML to JSON
+      var parser = new DOMParser();
+      var xmlDoc = parser.parseFromString(xml,"text/xml");
+      var parcelles = xmlDoc.getElementsByTagName('GeocodedAddress');
+      var jsonResp = []
+      for (var i=0, parc; parc= parcelles[i]; i++) {
+        var node = parc.getElementsByTagName('gml:pos')[0] || parc.getElementsByTagName('pos')[0];
+        var p = node.childNodes[0].nodeValue.split(' ');
+        var att = parc.getElementsByTagName('Place');
+        var json = { 
+          lon: Number(p[1]), 
+          lat: Number(p[0])
+        };
+        for (var k=0, a; a=att[k]; k++) {
+          json[a.attributes.type.value] = a.childNodes[0].nodeValue;
+        }
+        jsonResp.push(json);
       }
-      jsonResp.push(json);
-    }
-    self._listParcelle(jsonResp);
-  }, function() {
-    console.log('oops')
-  });
+      success(jsonResp);
+    }, 
+    { dataType: 'XML' }
+  );
 };
 
 /**

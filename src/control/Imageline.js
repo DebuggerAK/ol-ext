@@ -1,8 +1,8 @@
 import ol_ext_inherits from '../util/ext'
 import {unByKey as ol_Observable_unByKey} from 'ol/Observable'
 import ol_control_Control from 'ol/control/Control'
-import ol_has_TOUCH from 'ol/has'
 import ol_ext_element from '../util/element'
+import ol_ext_getMapCanvas from '../util/getMapCanvas'
 
 /** Image line control
  *
@@ -27,7 +27,7 @@ var ol_control_Imageline = function(options) {
     className: (options.className || '') + ' ol-imageline'
       + (options.target ? '': ' ol-unselectable ol-control')
       + (options.collapsed && options.collapsible ? 'ol-collapsed' : '')
-      + (ol_has_TOUCH ? ' ol-touch' : '')
+      + ('ontouchstart' in window ? ' ol-touch' : '')
   });
 
   if (!options.target && options.collapsible) {
@@ -296,7 +296,7 @@ ol_control_Imageline.prototype._drawLink = function(e) {
   if (!this.get('linkColor') | this.isCollapsed()) return;
   var map = this.getMap();
   if (map && this._select && this._select.elt) {
-    var ctx = e.context;
+    var ctx = e.context || ol_ext_getMapCanvas(this.getMap()).getContext('2d');
     var ratio = e.frameState.pixelRatio;
  
     var pt = [ 

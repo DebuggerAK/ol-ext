@@ -21,10 +21,12 @@ import {unByKey as ol_Observable_unByKey} from 'ol/Observable'
  *  @param {function} options.filter A function that takes a Feature and a Layer and returns true if the feature may be transformed or false otherwise.
  *  @param {Array<ol.Layer>} options.layers array of layers to transform,
  *  @param {ol.Collection<ol.Feature>} options.features collection of feature to transform,
- *	@param {ol.EventsConditionType|undefined} options.addCondition A function that takes an ol.MapBrowserEvent and returns a boolean to indicate whether that event should be handled. default: ol.events.condition.never.
+ *	@param {ol.EventsConditionType|undefined} options.condition A function that takes an ol.MapBrowserEvent and a feature collection and returns a boolean to indicate whether that event should be handled. default: ol.events.condition.always.
+ *	@param {ol.EventsConditionType|undefined} options.addCondition A function that takes an ol.MapBrowserEvent and returns a boolean to indicate whether that event should be handled ie. the feature will be added to the transforms features. default: ol.events.condition.never.
  *	@param {number | undefined} options.hitTolerance Tolerance to select feature in pixel, default 0
  *	@param {bool} options.translateFeature Translate when click on feature
  *	@param {bool} options.translate Can translate the feature
+ *  @param {bool} options.translateBBox Enable translate when the user drags inside the bounding box
  *	@param {bool} options.stretch can stretch the feature
  *	@param {bool} options.scale can scale the feature
  *	@param {bool} options.rotate can rotate the feature
@@ -32,6 +34,7 @@ import {unByKey as ol_Observable_unByKey} from 'ol/Observable'
  *	@param {bool} options.selection the intraction handle selection/deselection, if not use the select prototype to add features to transform, default true
  *	@param {ol.events.ConditionType | undefined} options.keepAspectRatio A function that takes an ol.MapBrowserEvent and returns a boolean to keep aspect ratio, default ol.events.condition.shiftKeyOnly.
  *	@param {ol.events.ConditionType | undefined} options.modifyCenter A function that takes an ol.MapBrowserEvent and returns a boolean to apply scale & strech from the center, default ol.events.condition.metaKey or ol.events.condition.ctrlKey.
+ *	@param {boolean} options.enableRotatedTransform Enable transform when map is rotated
  *	@param {} options.style list of ol.style for handles
  *
  */
@@ -71,11 +74,14 @@ var ol_interaction_Transform = function(options) {
   if (typeof(options.filter)==='function') this._filter = options.filter;
   this.layers_ = options.layers ? (options.layers instanceof Array) ? options.layers:[options.layers] : null;
 
+  this._handleEvent = options.condition || function() { return true; };
   this.addFn_ = options.addCondition || function() { return false; };
   /* Translate when click on feature */
   this.set('translateFeature', (options.translateFeature!==false));
   /* Can translate the feature */
   this.set('translate', (options.translate!==false));
+  /* Translate when click on the bounding box */
+  this.set('translateBBox', (options.translateBBox===true));
   /* Can stretch the feature */
   this.set('stretch', (options.stretch!==false));
   /* Can scale the feature */
@@ -92,6 +98,8 @@ var ol_interaction_Transform = function(options) {
   this.set('selection', (options.selection !== false));
   /*  */
   this.set('hitTolerance', (options.hitTolerance || 0));
+  /* Enable view rotated transforms */
+  this.set('enableRotatedTransform', (options.enableRotatedTransform || false));
 
 
   // Force redraw when changed
@@ -138,6 +146,9 @@ ol_interaction_Transform.prototype.setMap = function(map) {
   }
   ol_interaction_Pointer.prototype.setMap.call (this, map);
   this.overlayLayer_.setMap(map);
+  if (map === null) {
+    this.select(null);
+  }
   if (map !== null) {
     this.isTouch = /touch/.test(map.getViewport().className);
     this.setDefaultStyle();
@@ -242,7 +253,13 @@ ol_interaction_Transform.prototype.getFeatureAtPixel_ = function(pixel) {
       var found = false;
       // Overlay ?
       if (!layer) {
-        if (feature===self.bbox_) return false;
+        if (feature===self.bbox_) {
+          if (self.get('translateBBox')) {
+            return { feature: feature, handle: 'translate', constraint:'', option: '' };
+          } else {
+            return false;
+          }
+        }
         self.handles_.forEach (function(f) { if (f===feature) found=true; });
         if (found) return { feature: feature, handle:feature.get('handle'), constraint:feature.get('constraint'), option:feature.get('option') };
       }
@@ -279,6 +296,22 @@ ol_interaction_Transform.prototype.getFeatureAtPixel_ = function(pixel) {
   ) || {};
 }
 
+/** Rotate feature from map view rotation
+ * @param {ol.Feature} f the feature
+ * @param {boolean} clone clone resulting geom
+ * @param {ol.geom.Geometry} rotated geometry
+ */
+ol_interaction_Transform.prototype.getGeometryRotateToZero_ = function(f, clone) {
+  var origGeom = f.getGeometry();
+  var viewRotation = this.getMap().getView().getRotation();
+  if (viewRotation === 0 || !this.get('enableRotatedTransform')) {
+    return (clone) ? origGeom.clone() : origGeom;
+  }
+  var rotGeom = origGeom.clone();
+  rotGeom.rotate(viewRotation * -1, this.getMap().getView().getCenter());
+  return rotGeom;
+}
+
 /** Draw transform sketch
 * @param {boolean} draw only the center
 */
@@ -286,16 +319,22 @@ ol_interaction_Transform.prototype.drawSketch_ = function(center) {
   var i, f, geom;
   this.overlayLayer_.getSource().clear();
   if (!this.selection_.getLength()) return;
-  var ext = this.selection_.item(0).getGeometry().getExtent();
+  var viewRotation = this.getMap().getView().getRotation();
+  var ext = this.getGeometryRotateToZero_(this.selection_.item(0)).getExtent();
   // Clone and extend
   ext = ol_extent_buffer(ext, 0);
   this.selection_.forEach(function (f) {
-    ol_extent_extend(ext, f.getGeometry().getExtent());
-  });
+    var extendExt = this.getGeometryRotateToZero_(f).getExtent();
+    ol_extent_extend(ext, extendExt);
+  }.bind(this));
+
   if (center===true) {
     if (!this.ispt_) {
       this.overlayLayer_.getSource().addFeature(new ol_Feature( { geometry: new ol_geom_Point(this.center_), handle:'rotate0' }) );
       geom = ol_geom_Polygon_fromExtent(ext);
+      if (this.get('enableRotatedTransform') && viewRotation !== 0) {
+        geom.rotate(viewRotation, this.getMap().getView().getCenter())
+      }
       f = this.bbox_ = new ol_Feature(geom);
       this.overlayLayer_.getSource().addFeature (f);
     }
@@ -309,6 +348,9 @@ ol_interaction_Transform.prototype.drawSketch_ = function(center) {
       ]);
     }
     geom = ol_geom_Polygon_fromExtent(ext);
+    if (this.get('enableRotatedTransform') && viewRotation !== 0) {
+      geom.rotate(viewRotation, this.getMap().getView().getCenter())
+    }
     f = this.bbox_ = new ol_Feature(geom);
     var features = [];
     var g = geom.getCoordinates()[0];
@@ -356,8 +398,8 @@ ol_interaction_Transform.prototype.select = function(feature, add) {
   if (add) {
     this.selection_.push(feature);
   } else {
-    this.selection_.clear()
-    this.selection_.push(feature);
+	var index = this.selection_.getArray().indexOf(feature);
+	this.selection_.removeAt(index);	
   }
   this.ispt_ = (this.selection_.getLength()===1 ? (this.selection_.item(0).getGeometry().getType() == "Point") : false);
   this.iscircle_ = (this.selection_.getLength()===1 ? (this.selection_.item(0).getGeometry().getType() == "Circle") : false);
@@ -365,6 +407,23 @@ ol_interaction_Transform.prototype.select = function(feature, add) {
   this.watchFeatures_();
   // select event
   this.dispatchEvent({ type:'select', feature: feature, features: this.selection_ });
+};
+
+/** Update the selection collection.
+* @param {ol.Collection<ol.Feature>} features the features to transform
+*/
+ol_interaction_Transform.prototype.setSelection = function(features) {
+  this.selection_.clear();
+  features.forEach((feature) => {
+    this.selection_.push(feature);
+  });
+
+  this.ispt_ = (this.selection_.getLength()===1 ? (this.selection_.item(0).getGeometry().getType() == "Point") : false);
+  this.iscircle_ = (this.selection_.getLength()===1 ? (this.selection_.item(0).getGeometry().getType() == "Circle") : false);
+  this.drawSketch_();
+  this.watchFeatures_();
+  // select event
+  this.dispatchEvent({ type:'select', features: this.selection_ });
 };
 
 /** Watch selected features
@@ -381,7 +440,9 @@ ol_interaction_Transform.prototype.watchFeatures_ = function() {
   this.selection_.forEach(function(f) {
     this._featureListeners.push(
       f.on('change', function() {
-        this.drawSketch_();
+        if (!this.isUpdating_) {
+          this.drawSketch_();
+        }
       }.bind(this))
     );
   }.bind(this));
@@ -390,8 +451,10 @@ ol_interaction_Transform.prototype.watchFeatures_ = function() {
 /**
  * @param {ol.MapBrowserEvent} evt Map browser event.
  * @return {boolean} `true` to start the drag sequence.
+ * @private
  */
 ol_interaction_Transform.prototype.handleDownEvent_ = function(evt) {
+  if (!this._handleEvent(evt, this.selection_)) return;
   var sel = this.getFeatureAtPixel_(evt.pixel);
   var feature = sel.feature;
   if (this.selection_.getLength()
@@ -405,18 +468,28 @@ ol_interaction_Transform.prototype.handleDownEvent_ = function(evt) {
     this.opt_ = sel.option;
     this.constraint_ = sel.constraint;
     // Save info
+    var viewRotation = this.getMap().getView().getRotation();
     this.coordinate_ = evt.coordinate;
     this.pixel_ = evt.pixel;
     this.geoms_ = [];
+    this.rotatedGeoms_ = [];
     var extent = ol_extent_createEmpty();
+    var rotExtent = ol_extent_createEmpty();
     for (var i=0, f; f=this.selection_.item(i); i++) {
       this.geoms_.push(f.getGeometry().clone());
       extent = ol_extent_extend(extent, f.getGeometry().getExtent());
+      if (this.get('enableRotatedTransform') && viewRotation !== 0) {
+        var rotGeom = this.getGeometryRotateToZero_(f, true);
+        this.rotatedGeoms_.push(rotGeom);
+        rotExtent = ol_extent_extend(rotExtent, rotGeom.getExtent());
+      }
     }
     this.extent_ = (ol_geom_Polygon_fromExtent(extent)).getCoordinates()[0];
+    if (this.get('enableRotatedTransform') && viewRotation !== 0) {
+      this.rotatedExtent_ = (ol_geom_Polygon_fromExtent(rotExtent)).getCoordinates()[0];
+    }
     if (this.mode_==='rotate') {
       this.center_ = this.getCenter() || ol_extent_getCenter(extent);
-
       // we are now rotating (cursor down on rotate mode), so apply the grabbing cursor
       var element = evt.map.getTargetElement();
       element.style.cursor = this.Cursors.rotate0;
@@ -480,12 +553,18 @@ ol_interaction_Transform.prototype.setCenter = function(c) {
 
 /**
  * @param {ol.MapBrowserEvent} evt Map browser event.
+ * @private
  */
 ol_interaction_Transform.prototype.handleDragEvent_ = function(evt) {
+  if (!this._handleEvent(evt, this.features_)) return;
+  var viewRotation = this.getMap().getView().getRotation();
   var i, f, geometry;
+  var pt0 = [this.coordinate_[0], this.coordinate_[1]];
+  var pt = [evt.coordinate[0], evt.coordinate[1]];
+  this.isUpdating_ = true;
   switch (this.mode_) {
     case 'rotate': {
-      var a = Math.atan2(this.center_[1]-evt.coordinate[1], this.center_[0]-evt.coordinate[0]);
+      var a = Math.atan2(this.center_[1]-pt[1], this.center_[0]-pt[0]);
       if (!this.ispt) {
         // var geometry = this.geom_.clone();
         // geometry.rotate(a-this.angle_, this.center_);
@@ -510,8 +589,8 @@ ol_interaction_Transform.prototype.handleDragEvent_ = function(evt) {
       break;
     }
     case 'translate': {
-      var deltaX = evt.coordinate[0] - this.coordinate_[0];
-      var deltaY = evt.coordinate[1] - this.coordinate_[1];
+      var deltaX = pt[0] - pt0[0];
+      var deltaY = pt[1] - pt0[1];
 
       //this.feature_.getGeometry().translate(deltaX, deltaY);
       for (i=0, f; f=this.selection_.item(i); i++) {
@@ -535,11 +614,33 @@ ol_interaction_Transform.prototype.handleDragEvent_ = function(evt) {
     case 'scale': {
       var center = this.center_;
       if (this.get('modifyCenter')(evt)) {
-        center = this.extent_[(Number(this.opt_)+2)%4];
+        var extentCoordinates = this.extent_;
+        if (this.get('enableRotatedTransform') && viewRotation !== 0) {
+          extentCoordinates = this.rotatedExtent_;
+        }
+        center = extentCoordinates[(Number(this.opt_)+2)%4];
       }
 
-      var scx = (evt.coordinate[0] - center[0]) / (this.coordinate_[0] - center[0]);
-      var scy = (evt.coordinate[1] - center[1]) / (this.coordinate_[1] - center[1]);
+      var downCoordinate = this.coordinate_;
+      var dragCoordinate = evt.coordinate;
+      if (this.get('enableRotatedTransform') && viewRotation !== 0) {
+        var downPoint = new ol_geom_Point(this.coordinate_);
+        downPoint.rotate(viewRotation * -1, center);
+        downCoordinate = downPoint.getCoordinates();
+
+        var dragPoint = new ol_geom_Point(evt.coordinate);
+        dragPoint.rotate(viewRotation * -1, center);
+        dragCoordinate = dragPoint.getCoordinates();
+      }
+
+      var scx = ((dragCoordinate)[0] - (center)[0]) / (downCoordinate[0] - (center)[0]);
+      var scy = ((dragCoordinate)[1] - (center)[1]) / (downCoordinate[1] - (center)[1]);
+
+      if (this.get('enableRotatedTransform') && viewRotation !== 0) {
+        var centerPoint = new ol_geom_Point(center);
+        centerPoint.rotate(viewRotation * -1, this.getMap().getView().getCenter());
+        center = centerPoint.getCoordinates();
+      }
 
       if (this.get('noFlip')) {
         if (scx<0) scx=-scx;
@@ -556,7 +657,7 @@ ol_interaction_Transform.prototype.handleDragEvent_ = function(evt) {
       }
 
       for (i=0, f; f=this.selection_.item(i); i++) {
-        geometry = this.geoms_[i].clone();
+        geometry = (viewRotation === 0 || !this.get('enableRotatedTransform')) ? this.geoms_[i].clone() : this.rotatedGeoms_[i].clone();
         geometry.applyTransform(function(g1, g2, dim) {
           if (dim<2) return g2;
 
@@ -568,6 +669,10 @@ ol_interaction_Transform.prototype.handleDragEvent_ = function(evt) {
           if (geometry.getType() == 'Circle') geometry.setCenterAndRadius(geometry.getCenter(), geometry.getRadius());
           return g2;
         });
+        if (this.get('enableRotatedTransform') && viewRotation !== 0) {
+          //geometry.rotate(viewRotation, rotationCenter);
+          geometry.rotate(viewRotation, this.getMap().getView().getCenter());
+        }
         f.setGeometry(geometry);
       }
       this.drawSketch_();
@@ -583,26 +688,28 @@ ol_interaction_Transform.prototype.handleDragEvent_ = function(evt) {
     }
     default: break;
   }
+  this.isUpdating_ = false;
 };
 
 /**
  * @param {ol.MapBrowserEvent} evt Event.
+ * @private
  */
 ol_interaction_Transform.prototype.handleMoveEvent_ = function(evt) {
+  if (!this._handleEvent(evt, this.features_)) return;
   // console.log("handleMoveEvent");
   if (!this.mode_) {
     var sel = this.getFeatureAtPixel_(evt.pixel);
     var element = evt.map.getTargetElement();
-    if (sel.feature)
-    {	var c = sel.handle ? this.Cursors[(sel.handle||'default')+(sel.constraint||'')+(sel.option||'')] : this.Cursors.select;
+    if (sel.feature) {
+      var c = sel.handle ? this.Cursors[(sel.handle||'default')+(sel.constraint||'')+(sel.option||'')] : this.Cursors.select;
 
-      if (this.previousCursor_===undefined)
-      {	this.previousCursor_ = element.style.cursor;
+      if (this.previousCursor_===undefined) {
+        this.previousCursor_ = element.style.cursor;
       }
       element.style.cursor = c;
-    }
-    else
-    {	if (this.previousCursor_!==undefined) element.style.cursor = this.previousCursor_;
+    } else {
+      if (this.previousCursor_!==undefined) element.style.cursor = this.previousCursor_;
       this.previousCursor_ = undefined;
     }
   }
@@ -632,6 +739,13 @@ ol_interaction_Transform.prototype.handleUpEvent_ = function(evt) {
   this.drawSketch_();
   this.mode_ = null;
   return false;
+};
+
+/** Get the features that are selected for transform
+ * @return ol.Collection
+ */
+ol_interaction_Transform.prototype.getFeatures = function() {
+  return this.selection_;
 };
 
 export default ol_interaction_Transform
